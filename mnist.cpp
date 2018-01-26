@@ -59,8 +59,10 @@ class Tensor2D
             copy(rhs);
         }
 
-        void assign(const Tensor2D& rhs) {
+        void assign(const Tensor2D& rhs, bool donotassert=false) {
             if(this != &rhs) {
+                if(!donotassert)
+                    assert(rows() == rhs.rows() && cols() == rhs.cols());
                 this->~Tensor2D();
                 copy(rhs);
             }
@@ -86,6 +88,12 @@ class Tensor2D
             if (r >= _rows) throw out_of_range(msg1.c_str());
             return _data[r];
         }
+        
+        void set(T setval) {
+            for(size_t r = 0; r < _rows; ++r)
+                for(size_t c = 0; c < _cols; ++c)
+                    _data[r][c] = setval;
+        }
 
         size_t rows() const { return _rows; }
         size_t cols() const { return _cols; }
@@ -110,7 +118,7 @@ class Tensor2D
         Tensor2D& operator=(const Tensor2D& rhs);
 };
 
-
+// TODO - Delete me
 template <typename T>
 void px(const Tensor2D<T>& t)
 {
@@ -122,8 +130,7 @@ void px(const Tensor2D<T>& t)
 
 }
 
-
-// Dot product operation
+// Dot product between Tensor2D objects
 template<typename T>
 Tensor2D<T> dot(const Tensor2D<T>& left, const Tensor2D<T>& right)
 {
@@ -139,7 +146,7 @@ Tensor2D<T> dot(const Tensor2D<T>& left, const Tensor2D<T>& right)
     return t;
 }
 
-// Add, with broadcasting
+// Add Tensor2D objects, with broadcasting
 template<typename T>
 Tensor2D<T> add(const Tensor2D<T>& left, const Tensor2D<T>& right)
 {
@@ -152,6 +159,49 @@ Tensor2D<T> add(const Tensor2D<T>& left, const Tensor2D<T>& right)
             else
                 t.get(r, c) = left.get(r, c) + right.get(0, c);
         }
+
+    return t;
+}
+
+// Sub Tensor2D objects, with broadcasting
+template<typename T>
+Tensor2D<T> sub(const Tensor2D<T>& left, const Tensor2D<T>& right)
+{
+    Tensor2D<T> t(left.rows(), left.cols());
+
+    for(size_t r = 0; r < left.rows(); ++r)
+        for(size_t c = 0; c < left.cols(); ++c) {
+            if(right.rows() > 1)
+                t.get(r, c) = left.get(r, c) - right.get(r, c);
+            else
+                t.get(r, c) = left.get(r, c) - right.get(0, c);
+        }
+
+    return t;
+}
+
+// Mul Tensor2D objects
+template<typename T>
+Tensor2D<T> mul(const Tensor2D<T>& left, float x)
+{
+    Tensor2D<T> t(left.rows(), left.cols());
+
+    for(size_t r = 0; r < left.rows(); ++r)
+        for(size_t c = 0; c < left.cols(); ++c)
+            t.get(r, c) = left.get(r, c) * x;
+
+    return t;
+}
+
+
+// Transpose a Tensor2D object
+template<typename T>
+Tensor2D<T> transpose(const Tensor2D<T>& input) {
+    Tensor2D<T> t(input.cols(), input.rows());
+
+    for(size_t r = 0; r < input.rows(); ++r)
+        for(size_t c = 0; c < input.cols(); ++c)
+            t.get(c, r) = input.get(r, c);
 
     return t;
 }
@@ -237,83 +287,6 @@ class MNISTDataLoader
 };
 
 // -----------------------------------------------------------------------------
-// Section: Neural Network
-// -----------------------------------------------------------------------------
-
-// ReLU activation function
-template <typename T>
-Tensor2D<T>& relu(Tensor2D<T>& input) {
-    for(size_t r = 0; r < input.rows(); r++)
-        for(size_t c = 0; c < input.cols(); c++)
-            if(input.get(r, c) <= 0.0)
-                input.get(r, c) = 0.0;
-    return input;
-}
-
-// Linear layer
-template <typename T>
-class Linear 
-{
-    public:
-        explicit Linear(size_t in, size_t out)
-            : weights(in, out), biases(1, out), activations(1, out) {
-                init();
-        }
-
-        void forward(const Tensor2D<T>& input) {
-            auto scores = add(dot(input, weights), biases);
-            activations.assign(relu(scores));
-        }
-
-        const Tensor2D<T>& getacts() const {
-            return activations;
-        }
-
-    private:
-        Tensor2D<T> weights;
-        Tensor2D<T> biases;
-        Tensor2D<T> activations;
-
-        void init() {
-            for(size_t i = 0; i < weights.rows(); ++i)
-                for(size_t j = 0; j < weights.cols(); ++j)
-                    weights.get(i, j) = genrand();
-            for(size_t i = 0; i < biases.rows(); ++i)
-                for(size_t j = 0; j < biases.cols(); ++j)
-                    biases.get(i, j) = 0.001;
-        }
-
-
-};
-
-// The Network
-template <typename T>
-class Network
-{
-    public:
-        explicit Network(size_t in, size_t out, vector<int> layer_sizes) {
-            for(size_t i = 0; i < layer_sizes.size(); ++i) {
-                if(i == 0)
-                    layers.push_back(Linear<T>(in, layer_sizes[i]));
-                else layers.push_back(Linear<T>(layer_sizes[i-1], layer_sizes[i]));
-            }
-            layers.push_back(Linear<T>(layer_sizes[layer_sizes.size()-1], out));
-        }
-
-        void forward(const Tensor2D<T>& input) {
-            for(size_t i = 0; i < layers.size(); ++i) {
-                if(i == 0)
-                    layers[i].forward(input);
-                else 
-                    layers[i].forward(layers[i-1].getacts());
-            }
-        }
-
-    private:
-        vector<Linear<T>> layers;
-};
-
-// -----------------------------------------------------------------------------
 // Section: Loss function
 // -----------------------------------------------------------------------------
 template <typename T>
@@ -357,9 +330,155 @@ T logloss(const Tensor2D<T>& actual, const Tensor2D<T>& prediction) {
         size_t idx = actual.get(r, 0);
         loss += -1.0 * log(prediction.get(r, idx));
     }
-    return loss;
+    return loss / actual.rows();
 }
 
+// -----------------------------------------------------------------------------
+// Section: Neural Network
+// -----------------------------------------------------------------------------
+
+// ReLU activation function
+template <typename T>
+Tensor2D<T>& relu(Tensor2D<T>& input) {
+    for(size_t r = 0; r < input.rows(); r++)
+        for(size_t c = 0; c < input.cols(); c++)
+            if(input.get(r, c) <= 0.0)
+                input.get(r, c) = 0.0;
+    return input;
+}
+
+// Linear layer
+template <typename T>
+class Linear 
+{
+    public:
+        explicit Linear(size_t in, size_t out, bool add_relu = true)
+            : weights(in, out), biases(1, out), activations(0, 0), 
+              weights_grad(in, out), biases_grad(1, out), add_relu(add_relu) {
+                init();
+        }
+
+        void forward(const Tensor2D<T>& input) {
+            auto scores = add(dot(input, weights), biases);
+            if(add_relu) activations.assign(relu(scores), true);
+            else activations.assign(scores, true);
+        }
+
+        void backward(const Tensor2D<T>& grads) {
+        }
+
+        void clear() {
+            weights_grad.set(0.0);
+            biases_grad.set(0.0);
+            activations.set(0.0);
+        }
+
+        const Tensor2D<T>& getacts() const {
+            return activations;
+        }
+
+    public:
+        Tensor2D<T> weights;
+        Tensor2D<T> biases;
+        Tensor2D<T> weights_grad;
+        Tensor2D<T> biases_grad;
+        Tensor2D<T> activations;
+        bool add_relu;
+
+        void init() {
+            for(size_t i = 0; i < weights.rows(); ++i)
+                for(size_t j = 0; j < weights.cols(); ++j)
+                    weights.get(i, j) = genrand();
+            for(size_t i = 0; i < biases.rows(); ++i)
+                for(size_t j = 0; j < biases.cols(); ++j)
+                    biases.get(i, j) = 0.001;
+        }
+};
+
+// The Network
+template <typename T>
+class Network
+{
+    public:
+        explicit Network(size_t in, size_t out, size_t h1, size_t h2) 
+            : layer1(in, h1), layer2(h1, h2), layer3(h2, out, false) {
+        }
+
+        Tensor2D<T> forward(const Tensor2D<T>& input) {
+
+            layer1.forward(input);
+            layer2.forward(layer1.getacts());
+            layer3.forward(layer2.getacts());
+            return softmax(layer3.getacts());
+        }
+
+        void backward(Tensor2D<T> sm, const Tensor2D<T>& actual, const Tensor2D<T>& input) {
+            
+            // Backprop through softmax
+            for(size_t r = 0; r < sm.rows(); ++r)
+                sm.get(r, actual.get(r, 0)) -= 1;
+
+            for(size_t r = 0; r < sm.rows(); ++r)
+                for(size_t c = 0; c < sm.cols(); ++c)
+                    sm.get(r, c) /= sm.rows();
+
+            // Backprop through layer3 
+            layer3.weights_grad.assign(dot(transpose(layer2.getacts()), sm));
+            for(size_t r = 0; r < sm.rows(); ++r)
+                for(size_t c = 0; c < sm.cols(); ++c)
+                    layer3.biases_grad.get(0, c) += sm.get(r, c);
+
+            // Backprop through layer2 
+            auto hidden2 = dot(sm, transpose(layer3.weights));
+            for(size_t r = 0; r < hidden2.rows(); ++r)
+                for(size_t c = 0; c < hidden2.rows(); ++c)
+                    if (layer2.getacts().get(r, c) == 0)
+                        hidden2.get(r, c) = 0.0;
+
+            layer2.weights_grad.assign(dot(transpose(layer1.getacts()), hidden2));
+            for(size_t r = 0; r < hidden2.rows(); ++r)
+                for(size_t c = 0; c < hidden2.cols(); ++c)
+                    layer2.biases_grad.get(0, c) += hidden2.get(r, c);
+
+            // Backprop through layer1 
+            auto hidden1 = dot(hidden2, transpose(layer2.weights));
+            for(size_t r = 0; r < hidden1.rows(); ++r)
+                for(size_t c = 0; c < hidden1.rows(); ++c)
+                    if (layer1.getacts().get(r, c) == 0)
+                        hidden1.get(r, c) = 0.0;
+
+            layer1.weights_grad.assign(dot(transpose(input), hidden1));
+            for(size_t r = 0; r < hidden1.rows(); ++r)
+                for(size_t c = 0; c < hidden1.cols(); ++c)
+                    layer1.biases_grad.get(0, c) += hidden1.get(r, c);
+
+
+        }
+
+        void opt() {
+            layer1.weights.assign(sub(layer1.weights, mul(layer1.weights_grad, 0.01)));
+            layer2.weights.assign(sub(layer2.weights, mul(layer2.weights_grad, 0.01)));
+            layer3.weights.assign(sub(layer3.weights, mul(layer3.weights_grad, 0.01)));
+
+            layer1.biases.assign(sub(layer1.biases, mul(layer1.biases_grad, 0.01)));
+            layer2.biases.assign(sub(layer2.biases, mul(layer2.biases_grad, 0.01)));
+            layer3.biases.assign(sub(layer3.biases, mul(layer3.biases_grad, 0.01)));
+
+            clear();
+        }
+
+        void clear() {
+            layer1.clear();
+            layer2.clear();
+            layer3.clear();
+        }
+
+
+    private:
+        Linear<T> layer1;
+        Linear<T> layer2;
+        Linear<T> layer3;
+};
 // -----------------------------------------------------------------------------
 // Section: Optimizer
 // -----------------------------------------------------------------------------
@@ -438,14 +557,31 @@ int main()
     r.get(1, 1) = 9;
     r.get(1, 2) = 10;
 
+    Tensor2D<precision> y(2, 1);
+    y.get(0, 0) = 2;
+    y.get(1, 0) = 2;
+
     Linear<float> ll(3, 4);
     ll.forward(r); 
     // p(ll.getacts());
 
-    Network<precision> nt(3, 10, vector<int>({2, 4}));
-    nt.forward(r);
-    //nt.print();
+    Network<precision> nt(3, 10, 3, 4);
+    auto sm = nt.forward(r);
+    cout << logloss(y, sm) << endl;
+    nt.backward(sm, y, r); 
+    nt.opt();
 
+    int i = 100;
+
+    while(i-- > 0) {
+        auto sm1 = nt.forward(r);
+        cout << logloss(y, sm1) << endl;
+        nt.backward(sm1, y, r); 
+        nt.opt();
+    }
+
+    //nt.print();
+/*
     Tensor2D<precision> y(2, 1);
     y.get(0, 0) = 2;
     y.get(1, 0) = 2;
@@ -454,6 +590,7 @@ int main()
     auto sm = softmax(r);
     px(sm);
     cout << logloss(y, softmax(r)) << endl;
-
+*/
     return 0;
 }
+
