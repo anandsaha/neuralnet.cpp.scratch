@@ -23,6 +23,13 @@ const size_t pixels = 784;
 //typedef double precision;
 typedef float precision;
 
+// Get a random number sampled from normal distribution
+default_random_engine generator;
+normal_distribution<precision> distribution(0.0, 0.01);
+precision genrand() {
+    return distribution(generator);
+}
+
 // Error messages
 // -----------------------------------------------------------------------------
 string msg1 = "Tensor2D operation: indexes were out of range";
@@ -104,7 +111,7 @@ class Tensor2D
 
 
 template <typename T>
-void p(const Tensor2D<T>& t)
+void px(const Tensor2D<T>& t)
 {
     for(size_t i = 0; i < t.rows(); i++) {
         for(size_t j = 0; j < t.cols(); j++)
@@ -131,6 +138,7 @@ Tensor2D<T> dot(const Tensor2D<T>& left, const Tensor2D<T>& right)
     return t;
 }
 
+// Add, with broadcasting
 template<typename T>
 Tensor2D<T> add(const Tensor2D<T>& left, const Tensor2D<T>& right)
 {
@@ -235,8 +243,8 @@ template <typename T>
 Tensor2D<T>& relu(Tensor2D<T>& input) {
     for(size_t r = 0; r < input.rows(); r++)
         for(size_t c = 0; c < input.cols(); c++)
-            if(input.get(r, c) <= 0)
-                input.get(r, c) = 0;
+            if(input.get(r, c) <= 0.0)
+                input.get(r, c) = 0.0;
     return input;
 }
 
@@ -246,7 +254,8 @@ class Linear
 {
     public:
         explicit Linear(size_t in, size_t out)
-            : weights(in, out, 1), biases(1, out, 1), activations(1, out) {
+            : weights(in, out), biases(1, out), activations(1, out) {
+                init();
         }
 
         void forward(const Tensor2D<T>& input) {
@@ -262,6 +271,16 @@ class Linear
         Tensor2D<T> weights;
         Tensor2D<T> biases;
         Tensor2D<T> activations;
+
+        void init() {
+            for(size_t i = 0; i < weights.rows(); ++i)
+                for(size_t j = 0; j < weights.cols(); ++j)
+                    weights.get(i, j) = genrand();
+            for(size_t i = 0; i < biases.rows(); ++i)
+                for(size_t j = 0; j < biases.cols(); ++j)
+                    biases.get(i, j) = 0.001;
+        }
+
 
 };
 
@@ -285,13 +304,6 @@ class Network
                     layers[i].forward(input);
                 else 
                     layers[i].forward(layers[i-1].getacts());
-            }
-        }
-
-        void print() {
-            for(auto l: layers){
-                cout << "==" << endl;
-                p(l.getacts());
             }
         }
 
@@ -381,11 +393,11 @@ int main()
 
     Linear<float> ll(3, 4);
     ll.forward(r); 
-    p(ll.getacts());
+    // p(ll.getacts());
 
-    Network<precision> nt(3, 10, vector<int>({2}));
+    Network<precision> nt(3, 10, vector<int>({2, 4}));
     nt.forward(r);
-    nt.print();
+    //nt.print();
 
     return 0;
 }
