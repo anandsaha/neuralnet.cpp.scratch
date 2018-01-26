@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <cassert>
+#include <fstream>
 
 using namespace std;
 
@@ -14,10 +15,14 @@ const char* test_label  = "data/t10k-labels-idx1-ubyte";
 const size_t num_epochs = 100;
 const size_t batch_size = 100;
 
+typedef float precision;
+//typedef double precision;
+
 // Error messages
 // -----------------------------------------------------------------------------
 string msg1 = "Tensor2D operation: indexes were out of range";
 string msg2 = "left and right tensors do not have appropriate dimensions for dot product";
+string msg3 = "could not open file for reading";
 
 // Tensor infrastructure
 // -----------------------------------------------------------------------------
@@ -57,6 +62,8 @@ class Tensor2D
         T**         _data;
 };
 
+
+// Dot product operation
 template<typename T>
 Tensor2D<T> dot(const Tensor2D<T>& left, const Tensor2D<T>& right)
 {
@@ -72,22 +79,61 @@ Tensor2D<T> dot(const Tensor2D<T>& left, const Tensor2D<T>& right)
     return t;
 }
 
-// Reading train/test data
+// Reading train/test data with iterator
 // -----------------------------------------------------------------------------
+
+int b2i(const char* ptr, size_t idx) {
+    int val = 0;
+    val |= (unsigned char)ptr[idx+0]; val <<= 8;
+    val |= (unsigned char)ptr[idx+1]; val <<= 8;
+    val |= (unsigned char)ptr[idx+2]; val <<= 8;
+    val |= (unsigned char)ptr[idx+3];
+    return val;
+}
+
 class MNISTDataLoader
 {
     public:
-        explicit MNISTDataLoader(const char* data_path, const char* label_path): 
-            data_path(data_path), label_path(label_path) {
+        explicit MNISTDataLoader(const char* data_path, const char* label_path)
+            : _data(NULL), _label(NULL) {
+            
+            _data_size  = fill(_data, data_path);
+            _label_size = fill(_label, label_path);
+            _num_items  = b2i(_data, 4);
+            _num_rows   = b2i(_data, 8);
+            _num_cols   = b2i(_data, 12);
+            assert(_num_items == b2i(_label, 4));
         }
 
-        ~MNISTDataLoader() {}
+        ~MNISTDataLoader() {
+            delete[] _data;
+            delete[] _label;
+        }
 
     private:
-        string data_path;
-        string label_path;
-};
+        char* _data, * _label;
+        size_t _data_size, _label_size, _num_items, _num_rows, _num_cols;
 
+        /*
+        I am assuming that we have enough RAM to load the entire 
+        dataset into memory at once (~54 MB for MNIST). If not, I 
+        would have loaded it part by part on the fly.
+        */
+        size_t fill(char*& target, const char* file_path) {
+            ifstream fd(file_path, ios::in|ios::binary);
+            if(fd) {
+                fd.seekg(0, ios::end);
+                std::fstream::pos_type size = fd.tellg();
+                fd.seekg(0, ios::beg);
+                target = new char[size];
+                fd.read(&target[0], size);
+                fd.close();
+                return size;
+            } else {
+                throw runtime_error(msg3.c_str());
+            }
+        }
+};
 
 // Neural Network
 // -----------------------------------------------------------------------------
@@ -112,7 +158,7 @@ void p(const Tensor2D<T>& t)
 // -----------------------------------------------------------------------------
 int main()
 {
-    Tensor2D<float> t1(5, 5);
+    Tensor2D<precision> t1(5, 5);
     cout << t1.rows() << " " << t1.cols() << endl;
 
     t1.get(3, 3) = 1.2;
@@ -128,8 +174,13 @@ int main()
     
     cout << "====" << endl;
 
-    Tensor2D<float> l(2, 2);
-    Tensor2D<float> r(2, 3);
+
+
+    Tensor2D<precision> l(2, 2);
+    Tensor2D<precision> r(2, 3);
+    Tensor2D<precision> b(4, 3);
+
+    //dot(l, b);
 
     l.get(0, 0) = 1;
     l.get(0, 1) = 2;
@@ -143,9 +194,14 @@ int main()
     r.get(1, 1) = 9;
     r.get(1, 2) = 10;
 
-    Tensor2D<float> result = dot(l, r);
+    Tensor2D<precision> result = dot(l, r);
     p(l);
     p(r);
     p(result);
+
+
+    MNISTDataLoader train(train_data, train_label);
+    MNISTDataLoader test(test_data, test_label);
+
     return 0;
 }
