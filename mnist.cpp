@@ -31,40 +31,32 @@ string msg3 = "could not open file for reading";
 
 // Tensor infrastructure
 // -----------------------------------------------------------------------------
+
 template <typename T>
 class Tensor2D
 {
     public:
-        explicit Tensor2D(size_t rows, size_t cols)
+        explicit Tensor2D(size_t rows, size_t cols, bool init=false)
             : _rows(rows), _cols(cols) {
             _data = new T*[_rows];
             for(size_t r = 0; r < _rows; ++r)
                 _data[r] = new T[_cols];
+
+            if (init)
+                for(size_t r = 0; r < _rows; ++r)
+                    for(size_t c = 0; c < _cols; ++c)
+                        _data[r][c] = 1.0;
         }
 
         Tensor2D(const Tensor2D& rhs) {
-            _rows = rhs._rows;
-            _cols = rhs._cols;
-            _data = new T*[_rows];
-            for(size_t r = 0; r < _rows; ++r)
-                _data[r] = new T[_cols];
-            for(size_t r = 0; r < _rows; ++r)
-                for(size_t c = 0; c < _cols; ++c)
-                    _data[r][c] = rhs._data[r][c];
+            copy(rhs);
         }
 
-        Tensor2D& operator=(const Tensor2D& rhs) {
+        void assign(const Tensor2D& rhs) {
             if(this != &rhs) {
-                _rows = rhs._rows;
-                _cols = rhs._cols;
-                _data = new T*[_rows];
-                for(size_t r = 0; r < _rows; ++r)
-                    _data[r] = new T[_cols];
-                for(size_t r = 0; r < _rows; ++r)
-                    for(size_t c = 0; c < _cols; ++c)
-                        _data[r][c] = rhs._data[r][c];
+                this->~Tensor2D();
+                copy(rhs);
             }
-            return *this;
         }
 
         ~Tensor2D() {
@@ -95,7 +87,33 @@ class Tensor2D
         size_t      _rows;
         size_t      _cols;
         T**         _data;
+
+        void copy(const Tensor2D& rhs) {
+            _rows = rhs._rows;
+            _cols = rhs._cols;
+            _data = new T*[_rows];
+            for(size_t r = 0; r < _rows; ++r)
+                _data[r] = new T[_cols];
+            for(size_t r = 0; r < _rows; ++r)
+                for(size_t c = 0; c < _cols; ++c)
+                    _data[r][c] = rhs._data[r][c];
+        }
+
+        // Clients should use assign() function
+        Tensor2D& operator=(const Tensor2D& rhs);
 };
+
+
+template <typename T>
+void p(const Tensor2D<T>& t)
+{
+    for(size_t i = 0; i < t.rows(); i++) {
+        for(size_t j = 0; j < t.cols(); j++)
+            cout << t.get(i, j) << " ";
+        cout << endl;
+    }
+
+}
 
 
 // Dot product operation
@@ -122,9 +140,9 @@ Tensor2D<T> add(const Tensor2D<T>& left, const Tensor2D<T>& right)
     for(size_t r = 0; r < left.rows(); ++r)
         for(size_t c = 0; c < left.cols(); ++c) {
             if(right.rows() > 1)
-                t.get(r, c) = left.get(r, c) + left.get(r, c);
+                t.get(r, c) = left.get(r, c) + right.get(r, c);
             else
-                t.get(r, c) = left.get(r, c) + left.get(0, c);
+                t.get(r, c) = left.get(r, c) + right.get(0, c);
         }
 
     return t;
@@ -218,12 +236,11 @@ class Linear
 {
     public:
         explicit Linear(size_t in, size_t out)
-            : weights(in, out), biases(1, out), activations(1, out) {
+            : weights(in, out, true), biases(1, out, true), activations(1, out) {
         }
 
-        Tensor2D<T> forward(const Tensor2D<T>& input) {
-            activations.~Tensor2D();
-            activations = relu(add(dot(input, weights), biases));
+        const Tensor2D<T>& forward(const Tensor2D<T>& input) {
+            activations.assign(relu(add(dot(input, weights), biases)));
             return activations;
         }
 
@@ -276,21 +293,10 @@ class Network
 
 // Optimizer
 // -----------------------------------------------------------------------------
-
-template <typename T>
-void p(const Tensor2D<T>& t)
-{
-    for(size_t i = 0; i < t.rows(); i++) {
-        for(size_t j = 0; j < t.cols(); j++)
-            cout << t.get(i, j) << " ";
-        cout << endl;
-    }
-
-}
-
 // -----------------------------------------------------------------------------
 int main()
 {
+    /*
     Tensor2D<precision> t1(5, 5);
     cout << t1.rows() << " " << t1.cols() << endl;
 
@@ -337,7 +343,6 @@ int main()
     MNISTDataLoader test(test_data, test_label);
 
     batchtype p1 = train.fetch(2);
-
     for(int x = 0; x < 2; x++) {
         cout << p1.second.get(x, 0) << endl;
         cout << "[";
@@ -349,16 +354,26 @@ int main()
         }
         cout << "]" << endl;;
     }
-
-
-    Linear<float> ll(784, 10);
+    Linear<float> ll(2, 4);
     ll.print();
-    Tensor2D<float> input(10, 784);
-    Tensor2D<float> a1 = ll.forward(input);
-    //p(a1);
+    Tensor2D<float> a1 = ll.forward(l);
+    p(a1);
+*/
 
     //Network<precision> nt(pixels, 10, vector<int>({64, 1024, 512}));
     //nt.print();
 
+    Tensor2D<precision> r(2, 3);
+    r.get(0, 0) = 5;
+    r.get(0, 1) = 6;
+    r.get(0, 2) = 7;
+    r.get(1, 0) = 8;
+    r.get(1, 1) = 9;
+    r.get(1, 2) = 10;
+
+    Linear<float> ll(3, 4);
+    ll.print();
+    Tensor2D<float> a1 = ll.forward(r); 
+    p(a1);
     return 0;
 }
