@@ -6,6 +6,7 @@
 #include <random>
 #include <string>
 #include <cstring>
+#include <cmath>
 
 using namespace std;
 
@@ -235,7 +236,8 @@ class MNISTDataLoader
         }
 };
 
-// Neural Network
+// -----------------------------------------------------------------------------
+// Section: Neural Network
 // -----------------------------------------------------------------------------
 
 // ReLU activation function
@@ -311,12 +313,57 @@ class Network
         vector<Linear<T>> layers;
 };
 
-// Loss function
+// -----------------------------------------------------------------------------
+// Section: Loss function
+// -----------------------------------------------------------------------------
+template <typename T>
+T maxval(T* data, size_t count) {
+    T m = 0;
+    for(size_t i = 0; i < count; ++i)
+        if (data[i] > m) m = data[i];
+    return m;
+}
+
+// Numerically stable softmax
+template <typename T>
+Tensor2D<T> softmax(Tensor2D<T> scores) {
+
+    Tensor2D<T> max(scores.rows(), 1);
+    Tensor2D<T> expsum(scores.rows(), 1);
+
+    for(size_t r = 0; r < scores.rows(); ++r)
+        max.get(r, 0) = maxval(scores.getrow(r), scores.cols());
+
+    for(size_t r = 0; r < scores.rows(); ++r)
+        for(size_t c = 0; c < scores.cols(); ++c)
+            scores.get(r, c) = scores.get(r, c) - max.get(r, 0);
+
+    for(size_t r = 0; r < scores.rows(); ++r)
+        for(size_t c = 0; c < scores.cols(); ++c)
+            expsum.get(r, 0) += exp(scores.get(r, c)); 
+
+    for(size_t r = 0; r < scores.rows(); ++r)
+        for(size_t c = 0; c < scores.cols(); ++c)
+            scores.get(r, c) = exp(scores.get(r, c)) / expsum.get(r, 0);
+
+    return scores;
+}
+
+template<typename T>
+T logloss(const Tensor2D<T>& actual, const Tensor2D<T>& prediction) {
+    T loss = 0.0;
+    assert(actual.rows() == prediction.rows());
+    for(size_t r = 0; r < actual.rows(); ++r) {
+        size_t idx = actual.get(r, 0);
+        loss += -1.0 * log(prediction.get(r, idx));
+    }
+    return loss;
+}
+
+// -----------------------------------------------------------------------------
+// Section: Optimizer
 // -----------------------------------------------------------------------------
 
-// Optimizer
-// -----------------------------------------------------------------------------
-// -----------------------------------------------------------------------------
 int main()
 {
     /*
@@ -398,6 +445,15 @@ int main()
     Network<precision> nt(3, 10, vector<int>({2, 4}));
     nt.forward(r);
     //nt.print();
+
+    Tensor2D<precision> y(2, 1);
+    y.get(0, 0) = 2;
+    y.get(1, 0) = 2;
+
+    px(r);
+    auto sm = softmax(r);
+    px(sm);
+    cout << logloss(y, softmax(r)) << endl;
 
     return 0;
 }
