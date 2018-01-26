@@ -17,14 +17,13 @@ const char* train_label = "data/train-labels-idx1-ubyte";
 const char* test_data   = "data/t10k-images-idx3-ubyte";
 const char* test_label  = "data/t10k-labels-idx1-ubyte";
 
-const size_t num_epochs = 100;
+const size_t num_epochs = 5;
 const size_t batch_size = 100;
-const size_t pixels = 784;
+const size_t pixels     = 784; // 28 * 28
 
-//typedef double precision;
-typedef float precision;
+typedef float precision;       // what precision to use for the tensors
 
-// Get a random number sampled from normal distribution
+// Get random numbers sampled from normal distribution, for initializing weights
 default_random_engine generator;
 normal_distribution<precision> distribution(0.0, 0.01);
 precision genrand() {
@@ -44,34 +43,28 @@ template <typename T>
 class Tensor2D
 {
     public:
-        explicit Tensor2D(size_t rows, size_t cols, T initval=0.0)
+        explicit Tensor2D(size_t rows, size_t cols)
             : _rows(rows), _cols(cols) {
             _data = new T*[_rows];
             for(size_t r = 0; r < _rows; ++r)
                 _data[r] = new T[_cols];
 
-            for(size_t r = 0; r < _rows; ++r)
-                for(size_t c = 0; c < _cols; ++c)
-                    _data[r][c] = initval;
+            fill(0.0);
         }
 
         Tensor2D(const Tensor2D& rhs) {
             copy(rhs);
         }
 
-        void assign(const Tensor2D& rhs, bool donotassert=false) {
+        void assign(const Tensor2D& rhs) {
             if(this != &rhs) {
-                if(!donotassert)
-                    assert(rows() == rhs.rows() && cols() == rhs.cols());
-                this->~Tensor2D();
+                freemem();
                 copy(rhs);
             }
         }
 
         ~Tensor2D() {
-            for(size_t r = 0; r < _rows; ++r)
-                delete[] _data[r];
-            delete[] _data;
+            freemem();
         }
 
         T& get(size_t r, size_t c) { 
@@ -89,7 +82,7 @@ class Tensor2D
             return _data[r];
         }
         
-        void set(T setval) {
+        void fill(T setval) {
             for(size_t r = 0; r < _rows; ++r)
                 for(size_t c = 0; c < _cols; ++c)
                     _data[r][c] = setval;
@@ -112,6 +105,12 @@ class Tensor2D
             for(size_t r = 0; r < _rows; ++r)
                 for(size_t c = 0; c < _cols; ++c)
                     _data[r][c] = rhs._data[r][c];
+        }
+
+        void freemem() {
+            for(size_t r = 0; r < _rows; ++r)
+                delete[] _data[r];
+            delete[] _data;
         }
 
         // Clients should use assign() function
@@ -150,6 +149,8 @@ Tensor2D<T> dot(const Tensor2D<T>& left, const Tensor2D<T>& right)
 template<typename T>
 Tensor2D<T> add(const Tensor2D<T>& left, const Tensor2D<T>& right)
 {
+    assert(left.cols() == right.cols());
+    assert( (left.rows() == right.rows()) || (right.rows() == 1));
     Tensor2D<T> t(left.rows(), left.cols());
 
     for(size_t r = 0; r < left.rows(); ++r)
@@ -167,6 +168,8 @@ Tensor2D<T> add(const Tensor2D<T>& left, const Tensor2D<T>& right)
 template<typename T>
 Tensor2D<T> sub(const Tensor2D<T>& left, const Tensor2D<T>& right)
 {
+    assert(left.cols() == right.cols());
+    assert( (left.rows() == right.rows()) || (right.rows() == 1));
     Tensor2D<T> t(left.rows(), left.cols());
 
     for(size_t r = 0; r < left.rows(); ++r)
@@ -370,17 +373,17 @@ class Linear
 
         void forward(const Tensor2D<T>& input) {
             auto scores = add(dot(input, weights), biases);
-            if(add_relu) activations.assign(relu(scores), true);
-            else activations.assign(scores, true);
+            if(add_relu) activations.assign(relu(scores));
+            else activations.assign(scores);
         }
 
         void backward(const Tensor2D<T>& grads) {
         }
 
         void clear() {
-            weights_grad.set(0.0);
-            biases_grad.set(0.0);
-            activations.set(0.0);
+            weights_grad.fill(0.0);
+            biases_grad.fill(0.0);
+            activations.fill(0.0);
         }
 
         const Tensor2D<T>& getacts() const {
@@ -608,10 +611,10 @@ int main()
     MNISTDataLoader test(test_data, test_label);
     Network<precision> nt(784, 10, 512, 1024);
 
-    int i = 100;
-    while(i-- > 0) 
+    int i = num_epochs;
+    while(i-- >= 0) 
     {
-        batchtype batch = train.fetch(100);
+        batchtype batch = train.fetch(batch_size);
         auto sm = nt.forward(batch.first);
         cout << logloss(batch.second, sm) << endl;
         size_t totcorrect = 0;
