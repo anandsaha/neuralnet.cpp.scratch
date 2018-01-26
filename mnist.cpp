@@ -297,6 +297,16 @@ T maxval(T* data, size_t count) {
     return m;
 }
 
+template <typename T>
+size_t maxidx(T* data, size_t count) {
+    T m = 0;
+    size_t idx = -1;
+    for(size_t i = 0; i < count; ++i)
+        if (data[i] > m) { m = data[i]; idx = i; } 
+    return idx;
+}
+
+
 // Numerically stable softmax
 template <typename T>
 Tensor2D<T> softmax(Tensor2D<T> scores) {
@@ -323,7 +333,7 @@ Tensor2D<T> softmax(Tensor2D<T> scores) {
 }
 
 template<typename T>
-T logloss(const Tensor2D<T>& actual, const Tensor2D<T>& prediction) {
+T logloss(const Tensor2D<int>& actual, const Tensor2D<T>& prediction) {
     T loss = 0.0;
     assert(actual.rows() == prediction.rows());
     for(size_t r = 0; r < actual.rows(); ++r) {
@@ -412,7 +422,7 @@ class Network
             return softmax(layer3.getacts());
         }
 
-        void backward(Tensor2D<T> sm, const Tensor2D<T>& actual, const Tensor2D<T>& input) {
+        void backward(Tensor2D<T> sm, const Tensor2D<int>& actual, const Tensor2D<T>& input) {
             
             // Backprop through softmax
             for(size_t r = 0; r < sm.rows(); ++r)
@@ -455,14 +465,14 @@ class Network
 
         }
 
-        void opt() {
-            layer1.weights.assign(sub(layer1.weights, mul(layer1.weights_grad, 0.01)));
-            layer2.weights.assign(sub(layer2.weights, mul(layer2.weights_grad, 0.01)));
-            layer3.weights.assign(sub(layer3.weights, mul(layer3.weights_grad, 0.01)));
+        void opt(float lr=0.0001) {
+            layer1.weights.assign(sub(layer1.weights, mul(layer1.weights_grad, lr)));
+            layer2.weights.assign(sub(layer2.weights, mul(layer2.weights_grad, lr)));
+            layer3.weights.assign(sub(layer3.weights, mul(layer3.weights_grad, lr)));
 
-            layer1.biases.assign(sub(layer1.biases, mul(layer1.biases_grad, 0.01)));
-            layer2.biases.assign(sub(layer2.biases, mul(layer2.biases_grad, 0.01)));
-            layer3.biases.assign(sub(layer3.biases, mul(layer3.biases_grad, 0.01)));
+            layer1.biases.assign(sub(layer1.biases, mul(layer1.biases_grad, lr)));
+            layer2.biases.assign(sub(layer2.biases, mul(layer2.biases_grad, lr)));
+            layer3.biases.assign(sub(layer3.biases, mul(layer3.biases_grad, lr)));
 
             clear();
         }
@@ -549,6 +559,7 @@ int main()
     p(a1);
 */
 
+/*
     Tensor2D<precision> r(2, 3);
     r.get(0, 0) = 5;
     r.get(0, 1) = 6;
@@ -579,7 +590,7 @@ int main()
         nt.backward(sm1, y, r); 
         nt.opt();
     }
-
+*/
     //nt.print();
 /*
     Tensor2D<precision> y(2, 1);
@@ -591,6 +602,29 @@ int main()
     px(sm);
     cout << logloss(y, softmax(r)) << endl;
 */
+
+
+    MNISTDataLoader train(train_data, train_label);
+    MNISTDataLoader test(test_data, test_label);
+    Network<precision> nt(784, 10, 512, 1024);
+
+    int i = 100;
+    while(i-- > 0) 
+    {
+        batchtype batch = train.fetch(100);
+        auto sm = nt.forward(batch.first);
+        cout << logloss(batch.second, sm) << endl;
+        size_t totcorrect = 0;
+        for(size_t r = 0; r < sm.rows(); ++r) {
+            // cout << batch.second.get(r, 0) << ", " << maxidx(sm.getrow(r), sm.cols()) << endl;
+            if(batch.second.get(r, 0) == maxidx(sm.getrow(r), sm.cols()))
+                totcorrect++;
+        }
+        cout << totcorrect << "/" << sm.rows() << endl;
+        nt.backward(sm, batch.second, batch.first); 
+        nt.opt(0.001);
+    }
+
     return 0;
 }
 

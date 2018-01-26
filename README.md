@@ -10,6 +10,7 @@ Memory leak
 
 L10N messages
 
+L2 regularization
 
 Acknowledgement: 
 "How to read an entire file into memory in C++": 
