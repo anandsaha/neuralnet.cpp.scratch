@@ -53,6 +53,20 @@ class Tensor2D
                     _data[r][c] = rhs._data[r][c];
         }
 
+        Tensor2D& operator=(const Tensor2D& rhs) {
+            if(this != &rhs) {
+                _rows = rhs._rows;
+                _cols = rhs._cols;
+                _data = new T*[_rows];
+                for(size_t r = 0; r < _rows; ++r)
+                    _data[r] = new T[_cols];
+                for(size_t r = 0; r < _rows; ++r)
+                    for(size_t c = 0; c < _cols; ++c)
+                        _data[r][c] = rhs._data[r][c];
+            }
+            return *this;
+        }
+
         ~Tensor2D() {
             for(size_t r = 0; r < _rows; ++r)
                 delete[] _data[r];
@@ -81,7 +95,6 @@ class Tensor2D
         size_t      _rows;
         size_t      _cols;
         T**         _data;
-        Tensor2D& operator=(const Tensor2D&);
 };
 
 
@@ -97,6 +110,22 @@ Tensor2D<T> dot(const Tensor2D<T>& left, const Tensor2D<T>& right)
         for(size_t i = 0; i < left.cols(); i++)
             for(size_t c = 0; c < right.cols(); c++)
                 t.get(r, c) += left.get(r, i) * right.get(i, c);
+
+    return t;
+}
+
+template<typename T>
+Tensor2D<T> add(const Tensor2D<T>& left, const Tensor2D<T>& right)
+{
+    Tensor2D<T> t(left.rows(), left.cols());
+
+    for(size_t r = 0; r < left.rows(); ++r)
+        for(size_t c = 0; c < left.cols(); ++c) {
+            if(right.rows() > 1)
+                t.get(r, c) = left.get(r, c) + left.get(r, c);
+            else
+                t.get(r, c) = left.get(r, c) + left.get(0, c);
+        }
 
     return t;
 }
@@ -184,6 +213,63 @@ class MNISTDataLoader
 // Neural Network
 // -----------------------------------------------------------------------------
 
+template <typename T>
+class Linear 
+{
+    public:
+        explicit Linear(size_t in, size_t out)
+            : weights(in, out), biases(1, out), activations(1, out) {
+        }
+
+        Tensor2D<T> forward(const Tensor2D<T>& input) {
+            activations.~Tensor2D();
+            activations = relu(add(dot(input, weights), biases));
+            return activations;
+        }
+
+        void print() const {
+            cout << weights.rows() << "x" << weights.cols() << ", " << biases.cols() << endl;
+        }
+
+    private:
+        Tensor2D<T> weights;
+        Tensor2D<T> biases;
+        Tensor2D<T> activations;
+
+        Tensor2D<T> relu(Tensor2D<T> input) {
+            for(size_t r = 0; r < input.rows(); r++)
+                for(size_t c = 0; c < input.cols(); c++)
+                    if(input.get(r, c) <= 0)
+                        input.get(r, c) = 0;
+            return input;
+        }
+};
+
+template <typename T>
+class Network
+{
+    public:
+        explicit Network(size_t in, size_t out, vector<int> layer_sizes) {
+
+            for(size_t i = 0; i < layer_sizes.size(); ++i) {
+                if(i == 0)
+                    layers.push_back(Linear<T>(in, layer_sizes[i]));
+                else layers.push_back(Linear<T>(layer_sizes[i-1], layer_sizes[i]));
+            }
+            layers.push_back(Linear<T>(layer_sizes[layer_sizes.size()-1], out));
+        }
+
+        void forward(const Tensor2D<T>& input) {
+
+        }
+
+        void print() const {
+            for(auto l: layers) l.print();
+        }
+
+    private:
+        vector<Linear<T>> layers;
+};
 
 // Loss function
 // -----------------------------------------------------------------------------
@@ -250,21 +336,29 @@ int main()
     MNISTDataLoader train(train_data, train_label);
     MNISTDataLoader test(test_data, test_label);
 
-    batchtype p = train.fetch(2);
+    batchtype p1 = train.fetch(2);
 
     for(int x = 0; x < 2; x++) {
-        cout << p.second.get(x, 0) << endl;
+        cout << p1.second.get(x, 0) << endl;
         cout << "[";
         for(int i = 0; i < 28; i++) {
             cout << "[";
             for(int j = 0; j < 28; j++)
-                cout << p.first.get(x, (28*i) + j) << ",";
+                cout << p1.first.get(x, (28*i) + j) << ",";
             cout << "], ";
         }
         cout << "]" << endl;;
     }
 
 
+    Linear<float> ll(784, 10);
+    ll.print();
+    Tensor2D<float> input(10, 784);
+    Tensor2D<float> a1 = ll.forward(input);
+    //p(a1);
+
+    //Network<precision> nt(pixels, 10, vector<int>({64, 1024, 512}));
+    //nt.print();
 
     return 0;
 }
