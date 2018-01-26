@@ -36,16 +36,15 @@ template <typename T>
 class Tensor2D
 {
     public:
-        explicit Tensor2D(size_t rows, size_t cols, bool init=false)
+        explicit Tensor2D(size_t rows, size_t cols, T initval=0.0)
             : _rows(rows), _cols(cols) {
             _data = new T*[_rows];
             for(size_t r = 0; r < _rows; ++r)
                 _data[r] = new T[_cols];
 
-            if (init)
-                for(size_t r = 0; r < _rows; ++r)
-                    for(size_t c = 0; c < _cols; ++c)
-                        _data[r][c] = 1.0;
+            for(size_t r = 0; r < _rows; ++r)
+                for(size_t c = 0; c < _cols; ++c)
+                    _data[r][c] = initval;
         }
 
         Tensor2D(const Tensor2D& rhs) {
@@ -231,21 +230,32 @@ class MNISTDataLoader
 // Neural Network
 // -----------------------------------------------------------------------------
 
+// ReLU activation function
+template <typename T>
+Tensor2D<T>& relu(Tensor2D<T>& input) {
+    for(size_t r = 0; r < input.rows(); r++)
+        for(size_t c = 0; c < input.cols(); c++)
+            if(input.get(r, c) <= 0)
+                input.get(r, c) = 0;
+    return input;
+}
+
+// Linear layer
 template <typename T>
 class Linear 
 {
     public:
         explicit Linear(size_t in, size_t out)
-            : weights(in, out, true), biases(1, out, true), activations(1, out) {
+            : weights(in, out, 1), biases(1, out, 1), activations(1, out) {
         }
 
-        const Tensor2D<T>& forward(const Tensor2D<T>& input) {
-            activations.assign(relu(add(dot(input, weights), biases)));
+        void forward(const Tensor2D<T>& input) {
+            auto scores = add(dot(input, weights), biases);
+            activations.assign(relu(scores));
+        }
+
+        const Tensor2D<T>& getacts() const {
             return activations;
-        }
-
-        void print() const {
-            cout << weights.rows() << "x" << weights.cols() << ", " << biases.cols() << endl;
         }
 
     private:
@@ -253,21 +263,14 @@ class Linear
         Tensor2D<T> biases;
         Tensor2D<T> activations;
 
-        Tensor2D<T> relu(Tensor2D<T> input) {
-            for(size_t r = 0; r < input.rows(); r++)
-                for(size_t c = 0; c < input.cols(); c++)
-                    if(input.get(r, c) <= 0)
-                        input.get(r, c) = 0;
-            return input;
-        }
 };
 
+// The Network
 template <typename T>
 class Network
 {
     public:
         explicit Network(size_t in, size_t out, vector<int> layer_sizes) {
-
             for(size_t i = 0; i < layer_sizes.size(); ++i) {
                 if(i == 0)
                     layers.push_back(Linear<T>(in, layer_sizes[i]));
@@ -277,11 +280,19 @@ class Network
         }
 
         void forward(const Tensor2D<T>& input) {
-
+            for(size_t i = 0; i < layers.size(); ++i) {
+                if(i == 0)
+                    layers[i].forward(input);
+                else 
+                    layers[i].forward(layers[i-1].getacts());
+            }
         }
 
-        void print() const {
-            for(auto l: layers) l.print();
+        void print() {
+            for(auto l: layers){
+                cout << "==" << endl;
+                p(l.getacts());
+            }
         }
 
     private:
@@ -360,9 +371,6 @@ int main()
     p(a1);
 */
 
-    //Network<precision> nt(pixels, 10, vector<int>({64, 1024, 512}));
-    //nt.print();
-
     Tensor2D<precision> r(2, 3);
     r.get(0, 0) = 5;
     r.get(0, 1) = 6;
@@ -372,8 +380,12 @@ int main()
     r.get(1, 2) = 10;
 
     Linear<float> ll(3, 4);
-    ll.print();
-    Tensor2D<float> a1 = ll.forward(r); 
-    p(a1);
+    ll.forward(r); 
+    p(ll.getacts());
+
+    Network<precision> nt(3, 10, vector<int>({2}));
+    nt.forward(r);
+    nt.print();
+
     return 0;
 }
