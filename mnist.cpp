@@ -2,6 +2,10 @@
 #include <string>
 #include <cassert>
 #include <fstream>
+#include <algorithm>
+#include <random>
+#include <string>
+#include <cstring>
 
 using namespace std;
 
@@ -14,9 +18,10 @@ const char* test_label  = "data/t10k-labels-idx1-ubyte";
 
 const size_t num_epochs = 100;
 const size_t batch_size = 100;
+const size_t pixels = 784;
 
-typedef float precision;
 //typedef double precision;
+typedef float precision;
 
 // Error messages
 // -----------------------------------------------------------------------------
@@ -31,10 +36,21 @@ class Tensor2D
 {
     public:
         explicit Tensor2D(size_t rows, size_t cols)
-            : _rows(rows), _cols(cols){
+            : _rows(rows), _cols(cols) {
             _data = new T*[_rows];
-            for(size_t r = 0; r < _rows; r++)
+            for(size_t r = 0; r < _rows; ++r)
                 _data[r] = new T[_cols];
+        }
+
+        Tensor2D(const Tensor2D& rhs) {
+            _rows = rhs._rows;
+            _cols = rhs._cols;
+            _data = new T*[_rows];
+            for(size_t r = 0; r < _rows; ++r)
+                _data[r] = new T[_cols];
+            for(size_t r = 0; r < _rows; ++r)
+                for(size_t c = 0; c < _cols; ++c)
+                    _data[r][c] = rhs._data[r][c];
         }
 
         ~Tensor2D() {
@@ -53,6 +69,11 @@ class Tensor2D
             return _data[r][c]; 
         }
 
+        T* getrow(size_t r) {
+            if (r >= _rows) throw out_of_range(msg1.c_str());
+            return _data[r];
+        }
+
         size_t rows() const { return _rows; }
         size_t cols() const { return _cols; }
 
@@ -60,6 +81,7 @@ class Tensor2D
         size_t      _rows;
         size_t      _cols;
         T**         _data;
+        Tensor2D& operator=(const Tensor2D&);
 };
 
 
@@ -91,6 +113,8 @@ int b2i(const char* ptr, size_t idx) {
     return val;
 }
 
+typedef pair<Tensor2D<precision>, Tensor2D<int> > batchtype;
+
 class MNISTDataLoader
 {
     public:
@@ -108,6 +132,28 @@ class MNISTDataLoader
         ~MNISTDataLoader() {
             delete[] _data;
             delete[] _label;
+        }
+
+        batchtype fetch(int batch_size) {
+
+            Tensor2D<precision> data(batch_size, pixels);
+            Tensor2D<int>       label(batch_size, 1);
+
+            // TODO - put this in constructor
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> dis(0, _num_items-1);
+
+            for(int i = 0; i < batch_size; ++i) {
+                size_t offset = dis(gen);
+                label.get(i, 0) = _label[8 + offset];
+                // TODO - optimize
+                int off = 16 + (offset * pixels);
+                for(int p = 0; p < pixels; p++) 
+                    data.get(i, p) = (int)((unsigned char)_data[off + p]);
+            }
+
+            return batchtype(data, label);
         }
 
     private:
@@ -137,6 +183,7 @@ class MNISTDataLoader
 
 // Neural Network
 // -----------------------------------------------------------------------------
+
 
 // Loss function
 // -----------------------------------------------------------------------------
@@ -202,6 +249,22 @@ int main()
 
     MNISTDataLoader train(train_data, train_label);
     MNISTDataLoader test(test_data, test_label);
+
+    batchtype p = train.fetch(2);
+
+    for(int x = 0; x < 2; x++) {
+        cout << p.second.get(x, 0) << endl;
+        cout << "[";
+        for(int i = 0; i < 28; i++) {
+            cout << "[";
+            for(int j = 0; j < 28; j++)
+                cout << p.first.get(x, (28*i) + j) << ",";
+            cout << "], ";
+        }
+        cout << "]" << endl;;
+    }
+
+
 
     return 0;
 }
