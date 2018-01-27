@@ -164,7 +164,7 @@ Tensor2D<T> add(const Tensor2D<T>& left, const Tensor2D<T>& right)
     return t;
 }
 
-// Sub Tensor2D objects, with broadcasting
+// Subtract Tensor2D objects, with broadcasting
 template<typename T>
 Tensor2D<T> sub(const Tensor2D<T>& left, const Tensor2D<T>& right)
 {
@@ -183,7 +183,7 @@ Tensor2D<T> sub(const Tensor2D<T>& left, const Tensor2D<T>& right)
     return t;
 }
 
-// Mul Tensor2D objects
+// Multiply a Tensor2D object with a scalar
 template<typename T>
 Tensor2D<T> mul(const Tensor2D<T>& left, float x)
 {
@@ -492,121 +492,9 @@ class Network
         Linear<T> layer2;
         Linear<T> layer3;
 };
-// -----------------------------------------------------------------------------
-// Section: Optimizer
-// -----------------------------------------------------------------------------
 
-int main()
+void mnist()
 {
-    /*
-    Tensor2D<precision> t1(5, 5);
-    cout << t1.rows() << " " << t1.cols() << endl;
-
-    t1.get(3, 3) = 1.2;
-    t1.get(3, 4) = 2.5;
-
-    p(t1);
-
-    // t1.set(100, 100, 100);
-    // cout << t1.get(100, 100);
-
-    //Tensor2D<float> t2(51, 10);
-    //dot(t1, t2);
-    
-    cout << "====" << endl;
-
-
-
-    Tensor2D<precision> l(2, 2);
-    Tensor2D<precision> r(2, 3);
-    Tensor2D<precision> b(4, 3);
-
-    //dot(l, b);
-
-    l.get(0, 0) = 1;
-    l.get(0, 1) = 2;
-    l.get(1, 0) = 3;
-    l.get(1, 1) = 4;
-
-    r.get(0, 0) = 5;
-    r.get(0, 1) = 6;
-    r.get(0, 2) = 7;
-    r.get(1, 0) = 8;
-    r.get(1, 1) = 9;
-    r.get(1, 2) = 10;
-
-    Tensor2D<precision> result = dot(l, r);
-    p(l);
-    p(r);
-    p(result);
-
-
-    MNISTDataLoader train(train_data, train_label);
-    MNISTDataLoader test(test_data, test_label);
-
-    batchtype p1 = train.fetch(2);
-    for(int x = 0; x < 2; x++) {
-        cout << p1.second.get(x, 0) << endl;
-        cout << "[";
-        for(int i = 0; i < 28; i++) {
-            cout << "[";
-            for(int j = 0; j < 28; j++)
-                cout << p1.first.get(x, (28*i) + j) << ",";
-            cout << "], ";
-        }
-        cout << "]" << endl;;
-    }
-    Linear<float> ll(2, 4);
-    ll.print();
-    Tensor2D<float> a1 = ll.forward(l);
-    p(a1);
-*/
-
-/*
-    Tensor2D<precision> r(2, 3);
-    r.get(0, 0) = 5;
-    r.get(0, 1) = 6;
-    r.get(0, 2) = 7;
-    r.get(1, 0) = 8;
-    r.get(1, 1) = 9;
-    r.get(1, 2) = 10;
-
-    Tensor2D<precision> y(2, 1);
-    y.get(0, 0) = 2;
-    y.get(1, 0) = 2;
-
-    Linear<float> ll(3, 4);
-    ll.forward(r); 
-    // p(ll.getacts());
-
-    Network<precision> nt(3, 10, 3, 4);
-    auto sm = nt.forward(r);
-    cout << logloss(y, sm) << endl;
-    nt.backward(sm, y, r); 
-    nt.opt();
-
-    int i = 100;
-
-    while(i-- > 0) {
-        auto sm1 = nt.forward(r);
-        cout << logloss(y, sm1) << endl;
-        nt.backward(sm1, y, r); 
-        nt.opt();
-    }
-*/
-    //nt.print();
-/*
-    Tensor2D<precision> y(2, 1);
-    y.get(0, 0) = 2;
-    y.get(1, 0) = 2;
-
-    px(r);
-    auto sm = softmax(r);
-    px(sm);
-    cout << logloss(y, softmax(r)) << endl;
-*/
-
-
     MNISTDataLoader train(train_data, train_label);
     MNISTDataLoader test(test_data, test_label);
     Network<precision> nt(784, 10, 512, 1024);
@@ -627,7 +515,5 @@ int main()
         nt.backward(sm, batch.second, batch.first); 
         nt.opt(0.001);
     }
-
-    return 0;
 }
 
