@@ -81,6 +81,13 @@ void test_transpose() {
     pt(transpose(p.first));
 }
 
+void test_softmax() {
+    cout << "test_softmax" << endl;
+    auto p = getmock();
+    pt(softmax(p.first));
+}
+
+
 int main()
 {
     test_tensor();
@@ -89,5 +96,6 @@ int main()
     test_sub();
     test_mul();
     test_transpose();
+    test_softmax();
     return 0;
 }

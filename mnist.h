@@ -66,7 +66,7 @@ class Tensor2D
         ~Tensor2D() {
             freemem();
         }
-
+/*
         T& get(size_t r, size_t c) { 
             if (r >= _rows || c >= _cols) throw out_of_range(msg1.c_str());
             return _data[r][c]; 
@@ -76,7 +76,7 @@ class Tensor2D
             if (r >= _rows || c >= _cols) throw out_of_range(msg1.c_str());
             return _data[r][c]; 
         }
-
+*/
         T* const operator[](size_t r) {
             return _data[r];
         }
@@ -325,19 +325,19 @@ Tensor2D<T> softmax(Tensor2D<T> scores) {
     Tensor2D<T> expsum(scores.rows(), 1);
 
     for(size_t r = 0; r < scores.rows(); ++r)
-        max.get(r, 0) = maxval(scores.getrow(r), scores.cols());
+        max[r][0] = maxval(scores[r], scores.cols());
 
     for(size_t r = 0; r < scores.rows(); ++r)
         for(size_t c = 0; c < scores.cols(); ++c)
-            scores.get(r, c) = scores.get(r, c) - max.get(r, 0);
+            scores[r][c] = scores[r][c] - max[r][0];
 
     for(size_t r = 0; r < scores.rows(); ++r)
         for(size_t c = 0; c < scores.cols(); ++c)
-            expsum.get(r, 0) += exp(scores.get(r, c)); 
+            expsum[r][0] += exp(scores[r][c]); 
 
     for(size_t r = 0; r < scores.rows(); ++r)
         for(size_t c = 0; c < scores.cols(); ++c)
-            scores.get(r, c) = exp(scores.get(r, c)) / expsum.get(r, 0);
+            scores[r][c] = exp(scores[r][c]) / expsum[r][0];
 
     return scores;
 }
@@ -347,8 +347,8 @@ T logloss(const Tensor2D<int>& actual, const Tensor2D<T>& prediction) {
     T loss = 0.0;
     assert(actual.rows() == prediction.rows());
     for(size_t r = 0; r < actual.rows(); ++r) {
-        size_t idx = actual.get(r, 0);
-        loss += -1.0 * log(prediction.get(r, idx));
+        size_t idx = actual[r][0];
+        loss += -1.0 * log(prediction[r][idx]);
     }
     return loss / actual.rows();
 }
@@ -362,8 +362,8 @@ template <typename T>
 Tensor2D<T>& relu(Tensor2D<T>& input) {
     for(size_t r = 0; r < input.rows(); r++)
         for(size_t c = 0; c < input.cols(); c++)
-            if(input.get(r, c) <= 0.0)
-                input.get(r, c) = 0.0;
+            if(input[r][c] <= 0.0)
+                input[r][c] = 0.0;
     return input;
 }
 
@@ -408,10 +408,10 @@ class Linear
         void init() {
             for(size_t i = 0; i < weights.rows(); ++i)
                 for(size_t j = 0; j < weights.cols(); ++j)
-                    weights.get(i, j) = genrand();
+                    weights[i][j] = genrand();
             for(size_t i = 0; i < biases.rows(); ++i)
                 for(size_t j = 0; j < biases.cols(); ++j)
-                    biases.get(i, j) = 0.001;
+                    biases[i][j] = 0.001;
         }
 };
 
@@ -436,41 +436,41 @@ class Network
             
             // Backprop through softmax
             for(size_t r = 0; r < sm.rows(); ++r)
-                sm.get(r, actual.get(r, 0)) -= 1;
+                sm[r][actual[r][0]] -= 1;
 
             for(size_t r = 0; r < sm.rows(); ++r)
                 for(size_t c = 0; c < sm.cols(); ++c)
-                    sm.get(r, c) /= sm.rows();
+                    sm[r][c] /= sm.rows();
 
             // Backprop through layer3 
             layer3.weights_grad.assign(dot(transpose(layer2.getacts()), sm));
             for(size_t r = 0; r < sm.rows(); ++r)
                 for(size_t c = 0; c < sm.cols(); ++c)
-                    layer3.biases_grad.get(0, c) += sm.get(r, c);
+                    layer3.biases_grad[0][c] += sm[r][c];
 
             // Backprop through layer2 
             auto hidden2 = dot(sm, transpose(layer3.weights));
             for(size_t r = 0; r < hidden2.rows(); ++r)
                 for(size_t c = 0; c < hidden2.rows(); ++c)
-                    if (layer2.getacts().get(r, c) == 0)
-                        hidden2.get(r, c) = 0.0;
+                    if (layer2.getacts()[r][c] == 0)
+                        hidden2[r][c] = 0.0;
 
             layer2.weights_grad.assign(dot(transpose(layer1.getacts()), hidden2));
             for(size_t r = 0; r < hidden2.rows(); ++r)
                 for(size_t c = 0; c < hidden2.cols(); ++c)
-                    layer2.biases_grad.get(0, c) += hidden2.get(r, c);
+                    layer2.biases_grad[0][c] += hidden2[r][c];
 
             // Backprop through layer1 
             auto hidden1 = dot(hidden2, transpose(layer2.weights));
             for(size_t r = 0; r < hidden1.rows(); ++r)
                 for(size_t c = 0; c < hidden1.rows(); ++c)
-                    if (layer1.getacts().get(r, c) == 0)
-                        hidden1.get(r, c) = 0.0;
+                    if (layer1.getacts()[r][c] == 0)
+                        hidden1[r][c] = 0.0;
 
             layer1.weights_grad.assign(dot(transpose(input), hidden1));
             for(size_t r = 0; r < hidden1.rows(); ++r)
                 for(size_t c = 0; c < hidden1.cols(); ++c)
-                    layer1.biases_grad.get(0, c) += hidden1.get(r, c);
+                    layer1.biases_grad[0][c] += hidden1[r][c];
 
 
         }
@@ -515,7 +515,7 @@ void mnist()
         size_t totcorrect = 0;
         for(size_t r = 0; r < sm.rows(); ++r) {
             // cout << batch.second.get(r, 0) << ", " << maxidx(sm.getrow(r), sm.cols()) << endl;
-            if(batch.second.get(r, 0) == maxidx(sm.getrow(r), sm.cols()))
+            if(batch.second[r][0] == maxidx(sm.getrow(r), sm.cols()))
                 totcorrect++;
         }
         cout << totcorrect << "/" << sm.rows() << endl;
