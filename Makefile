@@ -1,6 +1,6 @@
 all:
-	g++ -std=c++11 -o mnist -pg main.cpp
-	g++ -std=c++11 -o test -pg test.cpp
+	g++ -O3 -std=c++11 -o mnist main.cpp
+	g++ -O3 -std=c++11 -o test  test.cpp
     
 clean:
 	rm mnist test
