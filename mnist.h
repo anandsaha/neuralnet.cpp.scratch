@@ -18,7 +18,7 @@ const char* test_data   = "data/t10k-images-idx3-ubyte";
 const char* test_label  = "data/t10k-labels-idx1-ubyte";
 
 const size_t num_epochs = 5;
-const size_t batch_size = 100;
+const size_t batch_size = 300;
 const size_t pixels     = 784; // 28 * 28
 
 typedef float precision;       // what precision to use for the tensors
@@ -77,6 +77,14 @@ class Tensor2D
             return _data[r][c]; 
         }
 
+        T* const operator[](size_t r) {
+            return _data[r];
+        }
+
+        const T* const operator[](size_t r) const {
+            return _data[r];
+        }
+
         T* getrow(size_t r) {
             if (r >= _rows) throw out_of_range(msg1.c_str());
             return _data[r];
@@ -117,13 +125,13 @@ class Tensor2D
         Tensor2D& operator=(const Tensor2D& rhs);
 };
 
-// TODO - Delete me
+// Print tensor
 template <typename T>
-void px(const Tensor2D<T>& t)
+void pt(const Tensor2D<T>& t)
 {
     for(size_t i = 0; i < t.rows(); i++) {
         for(size_t j = 0; j < t.cols(); j++)
-            cout << t.get(i, j) << " ";
+            cout << t[i][j] << " ";
         cout << endl;
     }
 
@@ -140,7 +148,7 @@ Tensor2D<T> dot(const Tensor2D<T>& left, const Tensor2D<T>& right)
     for(size_t r = 0; r < left.rows(); r++)
         for(size_t i = 0; i < left.cols(); i++)
             for(size_t c = 0; c < right.cols(); c++)
-                t.get(r, c) += left.get(r, i) * right.get(i, c);
+                t[r][c] += left[r][i] * right[i][c];
 
     return t;
 }
@@ -156,11 +164,10 @@ Tensor2D<T> add(const Tensor2D<T>& left, const Tensor2D<T>& right)
     for(size_t r = 0; r < left.rows(); ++r)
         for(size_t c = 0; c < left.cols(); ++c) {
             if(right.rows() > 1)
-                t.get(r, c) = left.get(r, c) + right.get(r, c);
+                t[r][c] = left[r][c] + right[r][c];
             else
-                t.get(r, c) = left.get(r, c) + right.get(0, c);
+                t[r][c] = left[r][c] + right[0][c];
         }
-
     return t;
 }
 
@@ -175,9 +182,9 @@ Tensor2D<T> sub(const Tensor2D<T>& left, const Tensor2D<T>& right)
     for(size_t r = 0; r < left.rows(); ++r)
         for(size_t c = 0; c < left.cols(); ++c) {
             if(right.rows() > 1)
-                t.get(r, c) = left.get(r, c) - right.get(r, c);
+                t[r][c] = left[r][c] - right[r][c];
             else
-                t.get(r, c) = left.get(r, c) - right.get(0, c);
+                t[r][c] = left[r][c] - right[0][c];
         }
 
     return t;
@@ -191,7 +198,7 @@ Tensor2D<T> mul(const Tensor2D<T>& left, float x)
 
     for(size_t r = 0; r < left.rows(); ++r)
         for(size_t c = 0; c < left.cols(); ++c)
-            t.get(r, c) = left.get(r, c) * x;
+            t[r][c] = left[r][c] * x;
 
     return t;
 }
@@ -204,7 +211,7 @@ Tensor2D<T> transpose(const Tensor2D<T>& input) {
 
     for(size_t r = 0; r < input.rows(); ++r)
         for(size_t c = 0; c < input.cols(); ++c)
-            t.get(c, r) = input.get(r, c);
+            t[c][r] = input[r][c];
 
     return t;
 }
@@ -254,11 +261,11 @@ class MNISTDataLoader
 
             for(int i = 0; i < batch_size; ++i) {
                 size_t offset = dis(gen);
-                label.get(i, 0) = _label[8 + offset];
+                label[i][0] = _label[8 + offset];
                 // TODO - optimize
                 int off = 16 + (offset * pixels);
                 for(int p = 0; p < pixels; p++) 
-                    data.get(i, p) = (int)((unsigned char)_data[off + p]);
+                    data[i][p] = (int)((unsigned char)_data[off + p]);
             }
 
             return batchtype(data, label);
