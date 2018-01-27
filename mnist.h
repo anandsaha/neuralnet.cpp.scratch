@@ -17,8 +17,8 @@ const char* train_label = "data/train-labels-idx1-ubyte";
 const char* test_data   = "data/t10k-images-idx3-ubyte";
 const char* test_label  = "data/t10k-labels-idx1-ubyte";
 
-const size_t num_epochs = 5;
-const size_t batch_size = 300;
+const size_t num_epochs = 2;
+const size_t batch_size = 10;
 const size_t pixels     = 784; // 28 * 28
 
 typedef float precision;       // what precision to use for the tensors
@@ -45,6 +45,7 @@ class Tensor2D
     public:
         explicit Tensor2D(size_t rows, size_t cols)
             : _rows(rows), _cols(cols) {
+
             _data = new T*[_rows];
             for(size_t r = 0; r < _rows; ++r)
                 _data[r] = new T[_cols];
@@ -56,37 +57,23 @@ class Tensor2D
             copy(rhs);
         }
 
-        void assign(const Tensor2D& rhs) {
+        Tensor2D& operator=(const Tensor2D& rhs) {
             if(this != &rhs) {
                 freemem();
                 copy(rhs);
             }
+            return *this;
         }
 
         ~Tensor2D() {
             freemem();
         }
-/*
-        T& get(size_t r, size_t c) { 
-            if (r >= _rows || c >= _cols) throw out_of_range(msg1.c_str());
-            return _data[r][c]; 
-        }
 
-        const T& get(size_t r, size_t c) const { 
-            if (r >= _rows || c >= _cols) throw out_of_range(msg1.c_str());
-            return _data[r][c]; 
-        }
-*/
         T* const operator[](size_t r) {
             return _data[r];
         }
 
         const T* const operator[](size_t r) const {
-            return _data[r];
-        }
-
-        T* getrow(size_t r) {
-            if (r >= _rows) throw out_of_range(msg1.c_str());
             return _data[r];
         }
         
@@ -120,9 +107,6 @@ class Tensor2D
                 delete[] _data[r];
             delete[] _data;
         }
-
-        // Clients should use assign() function
-        Tensor2D& operator=(const Tensor2D& rhs);
 };
 
 // Print tensor
@@ -380,8 +364,8 @@ class Linear
 
         void forward(const Tensor2D<T>& input) {
             auto scores = add(dot(input, weights), biases);
-            if(add_relu) activations.assign(relu(scores));
-            else activations.assign(scores);
+            if(add_relu) activations = relu(scores);
+            else activations = scores;
         }
 
         void backward(const Tensor2D<T>& grads) {
@@ -443,7 +427,7 @@ class Network
                     sm[r][c] /= sm.rows();
 
             // Backprop through layer3 
-            layer3.weights_grad.assign(dot(transpose(layer2.getacts()), sm));
+            layer3.weights_grad = dot(transpose(layer2.getacts()), sm);
             for(size_t r = 0; r < sm.rows(); ++r)
                 for(size_t c = 0; c < sm.cols(); ++c)
                     layer3.biases_grad[0][c] += sm[r][c];
@@ -455,7 +439,7 @@ class Network
                     if (layer2.getacts()[r][c] == 0)
                         hidden2[r][c] = 0.0;
 
-            layer2.weights_grad.assign(dot(transpose(layer1.getacts()), hidden2));
+            layer2.weights_grad = dot(transpose(layer1.getacts()), hidden2);
             for(size_t r = 0; r < hidden2.rows(); ++r)
                 for(size_t c = 0; c < hidden2.cols(); ++c)
                     layer2.biases_grad[0][c] += hidden2[r][c];
@@ -467,7 +451,7 @@ class Network
                     if (layer1.getacts()[r][c] == 0)
                         hidden1[r][c] = 0.0;
 
-            layer1.weights_grad.assign(dot(transpose(input), hidden1));
+            layer1.weights_grad = dot(transpose(input), hidden1);
             for(size_t r = 0; r < hidden1.rows(); ++r)
                 for(size_t c = 0; c < hidden1.cols(); ++c)
                     layer1.biases_grad[0][c] += hidden1[r][c];
@@ -476,13 +460,13 @@ class Network
         }
 
         void opt(float lr=0.0001) {
-            layer1.weights.assign(sub(layer1.weights, mul(layer1.weights_grad, lr)));
-            layer2.weights.assign(sub(layer2.weights, mul(layer2.weights_grad, lr)));
-            layer3.weights.assign(sub(layer3.weights, mul(layer3.weights_grad, lr)));
+            layer1.weights = sub(layer1.weights, mul(layer1.weights_grad, lr));
+            layer2.weights = sub(layer2.weights, mul(layer2.weights_grad, lr));
+            layer3.weights = sub(layer3.weights, mul(layer3.weights_grad, lr));
 
-            layer1.biases.assign(sub(layer1.biases, mul(layer1.biases_grad, lr)));
-            layer2.biases.assign(sub(layer2.biases, mul(layer2.biases_grad, lr)));
-            layer3.biases.assign(sub(layer3.biases, mul(layer3.biases_grad, lr)));
+            layer1.biases = sub(layer1.biases, mul(layer1.biases_grad, lr));
+            layer2.biases = sub(layer2.biases, mul(layer2.biases_grad, lr));
+            layer3.biases = sub(layer3.biases, mul(layer3.biases_grad, lr));
 
             clear();
         }
@@ -514,8 +498,7 @@ void mnist()
         cout << logloss(batch.second, sm) << endl;
         size_t totcorrect = 0;
         for(size_t r = 0; r < sm.rows(); ++r) {
-            // cout << batch.second.get(r, 0) << ", " << maxidx(sm.getrow(r), sm.cols()) << endl;
-            if(batch.second[r][0] == maxidx(sm.getrow(r), sm.cols()))
+            if(batch.second[r][0] == maxidx(sm[r], sm.cols()))
                 totcorrect++;
         }
         cout << totcorrect << "/" << sm.rows() << endl;
