@@ -1,19 +1,28 @@
 # leapmind
 
-TODO
+Neural net implementation in C++ from scratch. Trained MNIST with 3 layer network. Added weight regularization.
 
-Unit tests
+Developed on Ubuntu 16.04 using g++ 5.4 `g++ (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609`
 
-Profiling
+### Important Files
 
-Memory leak
+`mnist.h`: Main file with all the code
+`main.cpp`: Calls the `mnist()` function in `mnist.h`, that's all
+`data`: Directory where MNIST files are kept
+`data\dl.sh`: Bash script to download and unzip the MNIST files
 
-L10N messages
+### Download data
 
-L2 regularization
+```
+cd data
+./dl.sh
+cd ..
+```
 
-0 warnings
+### Build and Run
 
-Acknowledgement: 
-"How to read an entire file into memory in C++": 
-http://cpp.indi.frih.net/blog/2014/09/how-to-read-an-entire-file-into-memory-in-cpp/
+```
+make
+./mnist
+```
+
