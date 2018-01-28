@@ -15,20 +15,20 @@ using namespace std;
 // -----------------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------------
+const size_t num_epochs = 5;
+const size_t batch_size = 1000;
+const size_t pixels     = 784;   // 28 * 28
+const float  wt_reg     = 0.5;   // weight regularization strength
+const float  learn_rate = 0.001; 
+
 const char* train_data  = "data/train-images-idx3-ubyte";
 const char* train_label = "data/train-labels-idx1-ubyte";
 const char* test_data   = "data/t10k-images-idx3-ubyte";
 const char* test_label  = "data/t10k-labels-idx1-ubyte";
 
-const size_t num_epochs = 5;
-const size_t batch_size = 1000;
-const size_t pixels     = 784; // 28 * 28
-const float  wt_reg     = 0.5;
-const float  learn_rate = 0.001;
+typedef float precision;         // what precision to use for the tensors
 
-typedef float precision;       // what precision to use for the tensors
-
-// Get random numbers sampled from normal distribution, for initializing weights
+// To generate random numbers from gaussian distribution
 default_random_engine generator;
 normal_distribution<precision> distribution(0.0, 0.01);
 precision genrand() {
@@ -38,23 +38,7 @@ precision genrand() {
 std::random_device rd;
 std::mt19937 gen(rd());
 
-string gettime() 
-{
-    time_t rawtime;
-    struct tm * timeinfo;
-    char buffer[80];
-
-    time (&rawtime);
-    timeinfo = localtime(&rawtime);
-
-    strftime(buffer,sizeof(buffer),"%I:%M:%S",timeinfo);
-    std::string str(buffer);
-    return str;
-}
-
-// -----------------------------------------------------------------------------
 // Error messages
-// -----------------------------------------------------------------------------
 string msg1 = "Tensor2D operation: indexes were out of range";
 string msg2 = "left and right tensors do not have appropriate dimensions for dot product";
 string msg3 = "could not open file for reading";
@@ -149,15 +133,13 @@ class Tensor2D
 template<typename T>
 Tensor2D<T> dot(const Tensor2D<T>& left, const Tensor2D<T>& right)
 {
-    if(left.cols() != right.rows()) throw out_of_range(msg2.c_str());
-
+    assert(left.cols() == right.rows());
     Tensor2D<T> t(left.rows(), right.cols());
 
-    for(size_t r = 0; r < left.rows(); r++)
-        for(size_t i = 0; i < left.cols(); i++)
-            for(size_t c = 0; c < right.cols(); c++)
+    for(size_t r = 0; r < left.rows(); ++r)
+        for(size_t i = 0; i < left.cols(); ++i)
+            for(size_t c = 0; c < right.cols(); ++c)
                 t[r][c] += left[r][i] * right[i][c];
-
     return t;
 }
 
@@ -166,7 +148,7 @@ template<typename T>
 Tensor2D<T> add(const Tensor2D<T>& left, const Tensor2D<T>& right)
 {
     assert(left.cols() == right.cols());
-    assert( (left.rows() == right.rows()) || (right.rows() == 1));
+    assert((left.rows() == right.rows()) || (right.rows() == 1));
     Tensor2D<T> t(left.rows(), left.cols());
 
     for(size_t r = 0; r < left.rows(); ++r)
@@ -190,29 +172,25 @@ Tensor2D<T> sub(const Tensor2D<T>& left, const Tensor2D<T>& right)
             if(right.rows() > 1) t[r][c] = left[r][c] - right[r][c];
             else t[r][c] = left[r][c] - right[0][c];
         }
-
     return t;
 }
 
-// Multiply a Tensor2D object with a scalar
+// Multiply a Tensor2D object with a scalar float
 template<typename T>
 Tensor2D<T> mul(const Tensor2D<T>& left, float x)
 {
     Tensor2D<T> t(left.rows(), left.cols());
-
     for(size_t r = 0; r < left.rows(); ++r)
         for(size_t c = 0; c < left.cols(); ++c)
             t[r][c] = left[r][c] * x;
-
     return t;
 }
 
-
 // Transpose a Tensor2D object
 template<typename T>
-Tensor2D<T> transpose(const Tensor2D<T>& input) {
+Tensor2D<T> transpose(const Tensor2D<T>& input)
+{
     Tensor2D<T> t(input.cols(), input.rows());
-
     for(size_t r = 0; r < input.rows(); ++r)
         for(size_t c = 0; c < input.cols(); ++c)
             t[c][r] = input[r][c];
@@ -220,91 +198,11 @@ Tensor2D<T> transpose(const Tensor2D<T>& input) {
 }
 
 // -----------------------------------------------------------------------------
-// Reading MNIST train/test data with iterator
-// -----------------------------------------------------------------------------
-
-unsigned int b2i(const char* ptr, size_t idx) {
-    unsigned int val = 0;
-    val |= (unsigned char)ptr[idx+0]; val <<= 8;
-    val |= (unsigned char)ptr[idx+1]; val <<= 8;
-    val |= (unsigned char)ptr[idx+2]; val <<= 8;
-    val |= (unsigned char)ptr[idx+3];
-    return val;
-}
-
-// <data, label> pair
-typedef pair<Tensor2D<precision>, Tensor2D<unsigned int> > batchtype;
-
-class MNISTDataLoader
-{
-    public:
-        explicit MNISTDataLoader(const char* data_path, const char* label_path)
-            : _data(NULL), _label(NULL) {
-            
-            _data_size  = fill(_data, data_path);
-            _label_size = fill(_label, label_path);
-            _num_items  = b2i(_data, 4);
-            _num_rows   = b2i(_data, 8);
-            _num_cols   = b2i(_data, 12);
-            assert(_num_items == b2i(_label, 4));
-        }
-
-        ~MNISTDataLoader() {
-            delete[] _data;
-            delete[] _label;
-        }
-
-        batchtype fetch(int batch_size) {
-
-            Tensor2D<precision> data(batch_size, pixels);
-            Tensor2D<unsigned int>       label(batch_size, 1);
-            std::uniform_int_distribution<> dis(0, _num_items-1);
-
-            for(int i = 0; i < batch_size; ++i) {
-                size_t offset = dis(gen);
-                label[i][0] = _label[8 + offset];
-                int off = 16 + (offset * pixels);
-                for(size_t p = 0; p < pixels; p++)
-                    data[i][p] = (int)((unsigned char)_data[off + p]);
-            }
-
-            return batchtype(data, label);
-        }
-
-        size_t numitems() const {
-            return _num_items;
-        }
-
-    private:
-        char* _data, * _label;
-        size_t _data_size, _label_size, _num_items, _num_rows, _num_cols;
-
-        /*
-        I am assuming that we have enough RAM to load the entire 
-        dataset into memory at once (~54 MB for MNIST). If not, I 
-        would have loaded it part by part on the fly.
-        */
-        size_t fill(char*& target, const char* file_path) {
-            ifstream fd(file_path, ios::in|ios::binary);
-            if(fd) {
-                fd.seekg(0, ios::end);
-                std::fstream::pos_type size = fd.tellg();
-                fd.seekg(0, ios::beg);
-                target = new char[size];
-                fd.read(&target[0], size);
-                fd.close();
-                return size;
-            } else {
-                throw runtime_error(msg3.c_str());
-            }
-        }
-};
-
-// -----------------------------------------------------------------------------
 // Loss function
 // -----------------------------------------------------------------------------
+
 template <typename T>
-T maxval(T* data, size_t count) {
+T maxval(const T* const data, size_t count) {
     T m = 0;
     for(size_t i = 0; i < count; ++i)
         if (data[i] > m) m = data[i];
@@ -312,14 +210,13 @@ T maxval(T* data, size_t count) {
 }
 
 template <typename T>
-size_t maxidx(T* data, size_t count) {
+size_t maxidx(const T* const data, size_t count) {
     T m = 0;
     size_t idx = -1;
     for(size_t i = 0; i < count; ++i)
         if (data[i] > m) { m = data[i]; idx = i; } 
     return idx;
 }
-
 
 // Numerically stable softmax
 template <typename T>
@@ -348,8 +245,8 @@ Tensor2D<T> softmax(Tensor2D<T> scores) {
 
 // Log loss cross entropy
 template<typename T>
-T logloss(const Tensor2D<unsigned int>& actual, const Tensor2D<T>& prediction) {
-    T loss = 0.0;
+float logloss(const Tensor2D<size_t>& actual, const Tensor2D<T>& prediction) {
+    float loss = 0.0;
     assert(actual.rows() == prediction.rows());
     for(size_t r = 0; r < actual.rows(); ++r) {
         size_t idx = actual[r][0];
@@ -362,13 +259,12 @@ T logloss(const Tensor2D<unsigned int>& actual, const Tensor2D<T>& prediction) {
 // Neural Network
 // -----------------------------------------------------------------------------
 
-// ReLU activation function
+// ReLU activation function (modified the input, taken as reference)
 template <typename T>
 void relu(Tensor2D<T>& input) {
     for(size_t r = 0; r < input.rows(); r++)
         for(size_t c = 0; c < input.cols(); c++)
-            if(input[r][c] <= 0.0)
-                input[r][c] = 0.0;
+            if(input[r][c] <= 0.0) input[r][c] = 0.0;
 }
 
 // Linear layer
@@ -443,7 +339,8 @@ class Network
             return softmax(layer3.eval(layer2.eval(layer1.eval(input))));
         }
 
-        void backward(Tensor2D<T> sm, const Tensor2D<unsigned int>& actual, const Tensor2D<T>& input) {
+        void backward(Tensor2D<T> sm, const Tensor2D<size_t>& actual, 
+                const Tensor2D<T>& input) {
             
             // Backprop through softmax
             for(size_t r = 0; r < sm.rows(); ++r)
@@ -499,20 +396,104 @@ class Network
             clear();
         }
 
+    private:
+        Linear<T> layer1;
+        Linear<T> layer2;
+        Linear<T> layer3;
+
         void clear() {
             layer1.clear();
             layer2.clear();
             layer3.clear();
         }
 
-    private:
-        Linear<T> layer1;
-        Linear<T> layer2;
-        Linear<T> layer3;
 };
+
+// -----------------------------------------------------------------------------
+// Reading MNIST train/test data
+// -----------------------------------------------------------------------------
+
+unsigned int b2i(const char* ptr, size_t idx) {
+    unsigned int val = 0;
+    val |= (unsigned char)ptr[idx+0]; val <<= 8;
+    val |= (unsigned char)ptr[idx+1]; val <<= 8;
+    val |= (unsigned char)ptr[idx+2]; val <<= 8;
+    val |= (unsigned char)ptr[idx+3];
+    return val;
+}
+
+// <data, label> pair
+typedef pair<Tensor2D<precision>, Tensor2D<size_t> > batchtype;
+
+class MNISTDataLoader
+{
+    public:
+        explicit MNISTDataLoader(const char* data_path, const char* label_path)
+            : _data(NULL), _label(NULL) {
+            
+            _data_size  = fill(_data, data_path);
+            _label_size = fill(_label, label_path);
+            _num_items  = b2i(_data, 4);
+            _num_rows   = b2i(_data, 8);
+            _num_cols   = b2i(_data, 12);
+            assert(_num_items == b2i(_label, 4));
+        }
+
+        ~MNISTDataLoader() {
+            delete[] _data;
+            delete[] _label;
+        }
+
+        batchtype fetch(int batch_size) {
+
+            Tensor2D<precision>    data(batch_size, pixels);
+            Tensor2D<size_t>       label(batch_size, 1);
+            std::uniform_int_distribution<> dis(0, _num_items-1);
+
+            for(int i = 0; i < batch_size; ++i) {
+                size_t offset = dis(gen);
+                label[i][0] = static_cast<size_t>((unsigned char)_label[8 + offset]);
+                int off = 16 + (offset * pixels);
+                for(size_t p = 0; p < pixels; p++)
+                    data[i][p] = static_cast<precision>((unsigned char)_data[off + p]);
+            }
+
+            return batchtype(data, label);
+        }
+
+        size_t numitems() const {
+            return _num_items;
+        }
+
+    private:
+        char* _data, * _label;
+        size_t _data_size, _label_size, _num_items, _num_rows, _num_cols;
+
+        /*
+        I am assuming that we have enough RAM to load the entire 
+        dataset into memory at once (~54 MB for MNIST). If not, I 
+        would have loaded it part by part on the fly.
+        */
+        size_t fill(char*& target, const char* file_path) {
+            ifstream fd(file_path, ios::in|ios::binary);
+            if(fd) {
+                fd.seekg(0, ios::end);
+                std::fstream::pos_type size = fd.tellg();
+                fd.seekg(0, ios::beg);
+                target = new char[size];
+                fd.read(&target[0], size);
+                fd.close();
+                return size;
+            } else {
+                throw runtime_error(msg3.c_str());
+            }
+        }
+};
+
 
 float get_accuracy(const Network<precision>& nt, MNISTDataLoader& loader)
 {
+    // We will randomly select 5000 items from the set and calculate the accuracy
     batchtype data = loader.fetch(5000);
     auto sm = nt.eval(data.first);
     size_t totcorrect = 0;
@@ -540,7 +521,7 @@ void mnist()
         while(j <= batches) {
             batchtype batch = train.fetch(batch_size);
             auto sm = nt.forward(batch.first);
-
+            // Report progress
             if (j%10 == 0) {
                 float loss = logloss(batch.second, sm);
                 float trainacc = get_accuracy(nt, train);
@@ -552,12 +533,12 @@ void mnist()
                 cout << "Loss: " << loss << ", Train Acc: " << trainacc;
                 cout << ", Test Acc: " << testacc << endl;
             }
-            nt.backward(sm, batch.second, batch.first); 
-            nt.opt(0.001);
+
+            nt.backward(sm, batch.second, batch.first); // Find gradients 
+            nt.opt(0.001);                              // Do the learning
             j++;
         }
         i++;
     }
-
 }
 
