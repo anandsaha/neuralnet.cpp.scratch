@@ -57,7 +57,7 @@ class Tensor2D
                 fill(0.0);
         }
 
-        Tensor2D(const Tensor2D& rhs) {
+        Tensor2D(const Tensor2D& rhs): _data(nullptr) {
             copy(rhs);
         }
 
@@ -100,13 +100,14 @@ class Tensor2D
             _cols = rhs._cols;
 
             alloc(_rows, _cols);
-
+            // TODO - Use memcpy
             for(size_t r = 0; r < _rows; ++r)
                 for(size_t c = 0; c < _cols; ++c)
                     _data[r][c] = rhs._data[r][c];
         }
 
         void alloc(size_t rows, size_t cols) {
+            assert((!_data) && "_data is not null");
             _data = new T*[rows];
             for(size_t r = 0; r < rows; ++r)
                 _data[r] = new T[cols];
@@ -279,9 +280,8 @@ class Linear
         }
 
         void forward(const Tensor2D<T>& input) {
-            auto scores = add(dot(input, weights), biases);
-            if(add_relu) relu(scores);
-            activations = scores;
+            activations = add(dot(input, weights), biases);
+            if(add_relu) relu(activations);
         }
 
         Tensor2D<T> eval(const Tensor2D<T>& input) const {
@@ -360,7 +360,7 @@ class Network
             // Backprop through layer2 
             auto hidden2 = dot(sm, transpose(layer3.weights));
             for(size_t r = 0; r < hidden2.rows(); ++r)
-                for(size_t c = 0; c < hidden2.rows(); ++c)
+                for(size_t c = 0; c < hidden2.cols(); ++c)
                     if (layer2.getacts()[r][c] == 0)
                         hidden2[r][c] = 0.0;
 
@@ -373,9 +373,10 @@ class Network
             // Backprop through layer1 
             auto hidden1 = dot(hidden2, transpose(layer2.weights));
             for(size_t r = 0; r < hidden1.rows(); ++r)
-                for(size_t c = 0; c < hidden1.rows(); ++c)
+                for(size_t c = 0; c < hidden1.cols(); ++c) {
                     if (layer1.getacts()[r][c] == 0)
                         hidden1[r][c] = 0.0;
+                }
 
             layer1.weights_grad = dot(transpose(input), hidden1);
             layer1.weights_grad = add(layer1.weights_grad, mul(layer1.weights, wt_reg));
@@ -412,7 +413,7 @@ class Network
 // -----------------------------------------------------------------------------
 // Reading MNIST train/test data
 // -----------------------------------------------------------------------------
-
+// Combine 4 bytes to form an int, big endian assumed 
 unsigned int b2i(const char* ptr, size_t idx) {
     unsigned int val = 0;
     val |= (unsigned char)ptr[idx+0]; val <<= 8;
@@ -452,10 +453,13 @@ class MNISTDataLoader
 
             for(int i = 0; i < batch_size; ++i) {
                 size_t offset = dis(gen);
+                assert((_label_size > (8 + offset)) && "_label index failure");
                 label[i][0] = static_cast<size_t>((unsigned char)_label[8 + offset]);
                 int off = 16 + (offset * pixels);
-                for(size_t p = 0; p < pixels; p++)
+                for(size_t p = 0; p < pixels; p++) {
+                    assert((_data_size > (off + p)) && "_data index failure");
                     data[i][p] = static_cast<precision>((unsigned char)_data[off + p]);
+                }
             }
 
             return batchtype(data, label);
@@ -493,8 +497,8 @@ class MNISTDataLoader
 
 float get_accuracy(const Network<precision>& nt, MNISTDataLoader& loader)
 {
-    // We will randomly select 3000 items from the set and calculate the accuracy
-    batchtype data = loader.fetch(3000);
+    // We will randomly select items from the set and calculate the accuracy
+    batchtype data = loader.fetch(10000);
     auto sm = nt.eval(data.first);
     size_t totcorrect = 0;
     for(size_t r = 0; r < sm.rows(); ++r) {
