@@ -64,3 +64,5 @@ make
 ==23034== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
 
 ```
+
+`still reachable: 72,704 bytes in 1 blocks` is a known bug in gcc. Othersise all parameters are okay and suggests no leak.
