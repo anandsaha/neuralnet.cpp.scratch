@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cmath>
 #include <ctime>
+#include <iomanip>
 
 using namespace std;
 
@@ -19,7 +20,7 @@ const char* train_label = "data/train-labels-idx1-ubyte";
 const char* test_data   = "data/t10k-images-idx3-ubyte";
 const char* test_label  = "data/t10k-labels-idx1-ubyte";
 
-const size_t num_epochs = 60;
+const size_t num_epochs = 5;
 const size_t batch_size = 1000;
 const size_t pixels     = 784; // 28 * 28
 const float  wt_reg     = 0.5;
@@ -270,6 +271,10 @@ class MNISTDataLoader
             return batchtype(data, label);
         }
 
+        size_t numitems() const {
+            return _num_items;
+        }
+
     private:
         char* _data, * _label;
         size_t _data_size, _label_size, _num_items, _num_rows, _num_cols;
@@ -383,10 +388,10 @@ class Linear
             activations = scores;
         }
 
-        Tensor2D<T> eval(const Tensor2D<T>& input) {
+        Tensor2D<T> eval(const Tensor2D<T>& input) const {
             auto scores = add(dot(input, weights), biases);
-            if(add_relu) return relu(scores);
-            else return scores;
+            if(add_relu) relu(scores);
+            return scores;
         }
 
         void clear() {
@@ -434,7 +439,7 @@ class Network
             return softmax(layer3.getacts());
         }
 
-        Tensor2D<T> eval(const Tensor2D<T>& input) {
+        Tensor2D<T> eval(const Tensor2D<T>& input) const {
             return softmax(layer3.eval(layer2.eval(layer1.eval(input))));
         }
 
@@ -506,33 +511,53 @@ class Network
         Linear<T> layer3;
 };
 
+float get_accuracy(const Network<precision>& nt, MNISTDataLoader& loader)
+{
+    batchtype data = loader.fetch(5000);
+    auto sm = nt.eval(data.first);
+    size_t totcorrect = 0;
+    for(size_t r = 0; r < sm.rows(); ++r) {
+        if(data.second[r][0] == maxidx(sm[r], sm.cols()))
+            totcorrect++;
+    }
+
+    return (float)totcorrect/sm.rows();
+}
+
 void mnist()
 {
-    {
-        MNISTDataLoader train(train_data, train_label);
-        MNISTDataLoader test(test_data, test_label);
-        Network<precision> nt(784, 10, 512, 1024);
+    cout << "Starting MNIST training ..." << endl;
+    MNISTDataLoader train(train_data, train_label);
+    MNISTDataLoader test(test_data, test_label);
+    Network<precision> nt(784, 10, 512, 1024);
 
-        //batchtype testds = test.fetch(10000);
+    size_t epochs = num_epochs;
+    size_t batches = train.numitems() / batch_size;
+    size_t i = 1;
 
-        int i = 600; //num_epochs;
-        while(i-- > 0) 
-        {
+    while(i <= epochs) {
+        size_t j = 1;
+        while(j <= batches) {
             batchtype batch = train.fetch(batch_size);
             auto sm = nt.forward(batch.first);
-            float loss = logloss(batch.second, sm);
 
-            size_t totcorrect = 0;
-            for(size_t r = 0; r < sm.rows(); ++r) {
-                if(batch.second[r][0] == maxidx(sm[r], sm.cols()))
-                    totcorrect++;
+            if (j%10 == 0) {
+                float loss = logloss(batch.second, sm);
+                float trainacc = get_accuracy(nt, train);
+                float testacc = get_accuracy(nt, test);
+
+                cout << "Ep:" << i << "/" <<epochs << ", Batch:"; 
+                cout << j << "/" << batches << ") ";
+                cout << setprecision(3) << fixed;
+                cout << "Loss: " << loss << ", Train Acc: " << trainacc;
+                cout << ", Test Acc: " << testacc << endl;
             }
-
-            cout << i << ") Loss: " << loss << ", Train Accuracy: " << totcorrect << "/" << sm.rows() << endl;
             nt.backward(sm, batch.second, batch.first); 
             nt.opt(0.001);
-
+            j++;
         }
+        i++;
     }
+
 }
 
