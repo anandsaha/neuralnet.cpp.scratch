@@ -19,7 +19,7 @@ const char* train_label = "data/train-labels-idx1-ubyte";
 const char* test_data   = "data/t10k-images-idx3-ubyte";
 const char* test_label  = "data/t10k-labels-idx1-ubyte";
 
-const size_t num_epochs = 50;
+const size_t num_epochs = 60;
 const size_t batch_size = 1000;
 const size_t pixels     = 784; // 28 * 28
 const float  learn_rate = 0.001;
@@ -67,14 +67,8 @@ class Tensor2D
     public:
         explicit Tensor2D(size_t rows, size_t cols)
             : _rows(rows), _cols(cols), _data(nullptr) {
-
-            _data = new(nothrow) T*[_rows];
-            assert((_data) && "new() failed (1)");
-            for(size_t r = 0; r < _rows; ++r) {
-                _data[r] = new(nothrow) T[_cols];
-                assert((_data[r]) && "new() failed (2)");
-            }
-            fill(0.0);
+                alloc(_rows, _cols);
+                fill(0.0);
         }
 
         Tensor2D(const Tensor2D& rhs) {
@@ -83,14 +77,14 @@ class Tensor2D
 
         Tensor2D& operator=(const Tensor2D& rhs) {
             if(this != &rhs) {
-                freemem();
+                dealloc();
                 copy(rhs);
             }
             return *this;
         }
 
         ~Tensor2D() {
-            freemem();
+            dealloc();
         }
 
         T* const operator[](size_t r) {
@@ -118,18 +112,21 @@ class Tensor2D
         void copy(const Tensor2D& rhs) {
             _rows = rhs._rows;
             _cols = rhs._cols;
-            _data = new(nothrow) T*[_rows];
-            assert((_data) && "new() failed (3)");
-            for(size_t r = 0; r < _rows; ++r) {
-                _data[r] = new(nothrow) T[_cols];
-                assert((_data[r]) && "new() failed (4)");
-            }
+
+            alloc(_rows, _cols);
+
             for(size_t r = 0; r < _rows; ++r)
                 for(size_t c = 0; c < _cols; ++c)
                     _data[r][c] = rhs._data[r][c];
         }
 
-        void freemem() {
+        void alloc(size_t rows, size_t cols) {
+            _data = new T*[rows];
+            for(size_t r = 0; r < rows; ++r)
+                _data[r] = new T[cols];
+        }
+
+        void dealloc() {
             if (_data != nullptr) {
                 for(size_t r = 0; r < _rows; ++r) {
                     if(_data[r] != nullptr) {
@@ -140,6 +137,8 @@ class Tensor2D
                 delete[] _data;
                 _data = nullptr;
             }
+            _rows = 0;
+            _cols = 0;
         }
 
 };
@@ -250,7 +249,7 @@ unsigned int b2i(const char* ptr, size_t idx) {
 }
 
 // <data, label> pair
-typedef pair<Tensor2D<precision>, Tensor2D<int> > batchtype;
+typedef pair<Tensor2D<precision>, Tensor2D<unsigned int> > batchtype;
 
 class MNISTDataLoader
 {
@@ -274,7 +273,7 @@ class MNISTDataLoader
         batchtype fetch(int batch_size) {
 
             Tensor2D<precision> data(batch_size, pixels);
-            Tensor2D<int>       label(batch_size, 1);
+            Tensor2D<unsigned int>       label(batch_size, 1);
             std::uniform_int_distribution<> dis(0, _num_items-1);
 
             for(int i = 0; i < batch_size; ++i) {
@@ -361,7 +360,7 @@ Tensor2D<T> softmax(Tensor2D<T> scores) {
 
 // Log loss cross entropy
 template<typename T>
-T logloss(const Tensor2D<int>& actual, const Tensor2D<T>& prediction) {
+T logloss(const Tensor2D<unsigned int>& actual, const Tensor2D<T>& prediction) {
     T loss = 0.0;
     assert(actual.rows() == prediction.rows());
     for(size_t r = 0; r < actual.rows(); ++r) {
@@ -456,7 +455,7 @@ class Network
             return softmax(layer3.eval(layer2.eval(layer1.eval(input))));
         }
 
-        void backward(Tensor2D<T> sm, const Tensor2D<int>& actual, const Tensor2D<T>& input) {
+        void backward(Tensor2D<T> sm, const Tensor2D<unsigned int>& actual, const Tensor2D<T>& input) {
             
             // Backprop through softmax
             for(size_t r = 0; r < sm.rows(); ++r)
@@ -535,7 +534,6 @@ void mnist()
         {
             batchtype batch = train.fetch(batch_size);
             auto sm = nt.forward(batch.first);
-    /*
             cout << logloss(batch.second, sm) << endl;
             size_t totcorrect = 0;
             for(size_t r = 0; r < sm.rows(); ++r) {
@@ -543,7 +541,6 @@ void mnist()
                     totcorrect++;
             }
             cout << totcorrect << "/" << sm.rows() << endl;
-    */            
             nt.backward(sm, batch.second, batch.first); 
             nt.opt(0.001);
 
