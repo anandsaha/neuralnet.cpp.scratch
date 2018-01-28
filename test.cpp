@@ -7,6 +7,25 @@ extern int c;
 extern int cc;
 extern int d;
 
+// Print tensor
+template <typename T>
+void pt(const Tensor2D<T>& t)
+{
+        for(size_t i = 0; i < t.rows(); i++) {
+                    for(size_t j = 0; j < t.cols(); j++)
+                                    cout << t[i][j] << " ";
+                            cout << endl;
+                                }
+}
+
+//Print dimension
+template <typename T>
+void pd(const Tensor2D<T>& t)
+{
+        cout << t.rows() << "x" << t.cols() << endl;
+}
+
+
 pair<Tensor2D<precision>, Tensor2D<precision>>
 getmock() {
     Tensor2D<precision> t1(2, 3);

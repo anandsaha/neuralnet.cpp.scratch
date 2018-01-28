@@ -22,6 +22,7 @@ const char* test_label  = "data/t10k-labels-idx1-ubyte";
 const size_t num_epochs = 60;
 const size_t batch_size = 1000;
 const size_t pixels     = 784; // 28 * 28
+const float  wt_reg     = 0.5;
 const float  learn_rate = 0.001;
 
 typedef float precision;       // what precision to use for the tensors
@@ -143,24 +144,6 @@ class Tensor2D
 
 };
 
-// Print tensor
-template <typename T>
-void pt(const Tensor2D<T>& t)
-{
-    for(size_t i = 0; i < t.rows(); i++) {
-        for(size_t j = 0; j < t.cols(); j++)
-            cout << t[i][j] << " ";
-        cout << endl;
-    }
-}
-
-//Print dimension
-template <typename T>
-void pd(const Tensor2D<T>& t)
-{
-    cout << t.rows() << "x" << t.cols() << endl;
-}
-
 // Dot product between Tensor2D objects
 template<typename T>
 Tensor2D<T> dot(const Tensor2D<T>& left, const Tensor2D<T>& right)
@@ -198,7 +181,7 @@ template<typename T>
 Tensor2D<T> sub(const Tensor2D<T>& left, const Tensor2D<T>& right)
 {
     assert(left.cols() == right.cols());
-    assert( (left.rows() == right.rows()) || (right.rows() == 1));
+    assert((left.rows() == right.rows()) || (right.rows() == 1));
     Tensor2D<T> t(left.rows(), left.cols());
 
     for(size_t r = 0; r < left.rows(); ++r)
@@ -467,6 +450,7 @@ class Network
 
             // Backprop through layer3 
             layer3.weights_grad = dot(transpose(layer2.getacts()), sm);
+            layer3.weights_grad = add(layer3.weights_grad, mul(layer3.weights, wt_reg));
             for(size_t r = 0; r < sm.rows(); ++r)
                 for(size_t c = 0; c < sm.cols(); ++c)
                     layer3.biases_grad[0][c] += sm[r][c];
@@ -479,6 +463,7 @@ class Network
                         hidden2[r][c] = 0.0;
 
             layer2.weights_grad = dot(transpose(layer1.getacts()), hidden2);
+            layer2.weights_grad = add(layer2.weights_grad, mul(layer2.weights, wt_reg));
             for(size_t r = 0; r < hidden2.rows(); ++r)
                 for(size_t c = 0; c < hidden2.cols(); ++c)
                     layer2.biases_grad[0][c] += hidden2[r][c];
@@ -491,6 +476,7 @@ class Network
                         hidden1[r][c] = 0.0;
 
             layer1.weights_grad = dot(transpose(input), hidden1);
+            layer1.weights_grad = add(layer1.weights_grad, mul(layer1.weights, wt_reg));
             for(size_t r = 0; r < hidden1.rows(); ++r)
                 for(size_t c = 0; c < hidden1.cols(); ++c)
                     layer1.biases_grad[0][c] += hidden1[r][c];
@@ -529,25 +515,23 @@ void mnist()
 
         //batchtype testds = test.fetch(10000);
 
-        int i = num_epochs;
+        int i = 600; //num_epochs;
         while(i-- > 0) 
         {
             batchtype batch = train.fetch(batch_size);
             auto sm = nt.forward(batch.first);
-            cout << logloss(batch.second, sm) << endl;
+            float loss = logloss(batch.second, sm);
+
             size_t totcorrect = 0;
             for(size_t r = 0; r < sm.rows(); ++r) {
                 if(batch.second[r][0] == maxidx(sm[r], sm.cols()))
                     totcorrect++;
             }
-            cout << totcorrect << "/" << sm.rows() << endl;
+
+            cout << i << ") Loss: " << loss << ", Train Accuracy: " << totcorrect << "/" << sm.rows() << endl;
             nt.backward(sm, batch.second, batch.first); 
             nt.opt(0.001);
 
-            cout << i << endl;
-            //int numbatches = 60000 / batch_size;
-            //while(numbatches-- > 0) {
-            //}
         }
     }
 }
