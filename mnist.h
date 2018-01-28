@@ -19,8 +19,8 @@ const char* train_label = "data/train-labels-idx1-ubyte";
 const char* test_data   = "data/t10k-images-idx3-ubyte";
 const char* test_label  = "data/t10k-labels-idx1-ubyte";
 
-const size_t num_epochs = 2;
-const size_t batch_size = 1000;
+const size_t num_epochs = 6;
+const size_t batch_size = 10000;
 const size_t pixels     = 784; // 28 * 28
 const float  learn_rate = 0.001;
 
@@ -66,12 +66,14 @@ class Tensor2D
 {
     public:
         explicit Tensor2D(size_t rows, size_t cols)
-            : _rows(rows), _cols(cols) {
+            : _rows(rows), _cols(cols), _data(nullptr) {
 
-            _data = new T*[_rows];
-            for(size_t r = 0; r < _rows; ++r)
-                _data[r] = new T[_cols];
-
+            _data = new(nothrow) T*[_rows];
+            assert((_data) && "new() failed (1)");
+            for(size_t r = 0; r < _rows; ++r) {
+                _data[r] = new(nothrow) T[_cols];
+                assert((_data[r]) && "new() failed (2)");
+            }
             fill(0.0);
         }
 
@@ -116,18 +118,28 @@ class Tensor2D
         void copy(const Tensor2D& rhs) {
             _rows = rhs._rows;
             _cols = rhs._cols;
-            _data = new T*[_rows];
-            for(size_t r = 0; r < _rows; ++r)
-                _data[r] = new T[_cols];
+            _data = new(nothrow) T*[_rows];
+            assert((_data) && "new() failed (3)");
+            for(size_t r = 0; r < _rows; ++r) {
+                _data[r] = new(nothrow) T[_cols];
+                assert((_data[r]) && "new() failed (4)");
+            }
             for(size_t r = 0; r < _rows; ++r)
                 for(size_t c = 0; c < _cols; ++c)
                     _data[r][c] = rhs._data[r][c];
         }
 
         void freemem() {
-            for(size_t r = 0; r < _rows; ++r)
-                delete[] _data[r];
-            delete[] _data;
+            if (_data != nullptr) {
+                for(size_t r = 0; r < _rows; ++r) {
+                    if(_data[r] != nullptr) {
+                        delete[] _data[r];
+                        _data[r] = nullptr;
+                    }
+                }
+                delete[] _data;
+                _data = nullptr;
+            }
         }
 };
 
@@ -140,6 +152,13 @@ void pt(const Tensor2D<T>& t)
             cout << t[i][j] << " ";
         cout << endl;
     }
+}
+
+//Print dimension
+template <typename T>
+void pd(const Tensor2D<T>& t)
+{
+    cout << t.rows() << "x" << t.cols() << endl;
 }
 
 // Dot product between Tensor2D objects
@@ -504,18 +523,19 @@ class Network
 
 void mnist()
 {
-    MNISTDataLoader train(train_data, train_label);
-    MNISTDataLoader test(test_data, test_label);
-    Network<precision> nt(784, 10, 512, 1024);
-
-    //batchtype testds = test.fetch(10000);
-
-    int i = 100; // num_epochs;
-    while(i-- > 0) 
     {
+        MNISTDataLoader train(train_data, train_label);
+        MNISTDataLoader test(test_data, test_label);
+        Network<precision> nt(784, 10, 512, 1024);
+
+        //batchtype testds = test.fetch(10000);
+
+        int i = num_epochs;
+        while(i-- > 0) 
+        {
             batchtype batch = train.fetch(batch_size);
             auto sm = nt.forward(batch.first);
-            
+    /*
             cout << logloss(batch.second, sm) << endl;
             size_t totcorrect = 0;
             for(size_t r = 0; r < sm.rows(); ++r) {
@@ -523,14 +543,15 @@ void mnist()
                     totcorrect++;
             }
             cout << totcorrect << "/" << sm.rows() << endl;
-            
+    */            
             nt.backward(sm, batch.second, batch.first); 
             nt.opt(0.001);
 
             cout << i << endl;
-        //int numbatches = 60000 / batch_size;
-        //while(numbatches-- > 0) {
-        //}
+            //int numbatches = 60000 / batch_size;
+            //while(numbatches-- > 0) {
+            //}
+        }
     }
 }
 

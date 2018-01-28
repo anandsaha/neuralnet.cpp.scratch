@@ -3,6 +3,10 @@
 // Right now the tests are validated by visual inspection
 // Can be binded to a unit testing framework for automation
 
+extern int c;
+extern int cc;
+extern int d;
+
 pair<Tensor2D<precision>, Tensor2D<precision>>
 getmock() {
     Tensor2D<precision> t1(2, 3);
@@ -87,6 +91,18 @@ void test_softmax() {
     pt(softmax(p.first));
 }
 
+void test_memory() {
+    cout << "test_memory" << endl;
+    for(size_t i = 0; i < 10; ++i) {
+        Tensor2D<float> t1(10000, 10000);
+        Tensor2D<float> t2(10000, 10000);
+        Tensor2D<float> t3 = t1;
+        Tensor2D<float> t4(10000, 10000);
+        //t4 = add(dot(t1, t2), t3);
+    }
+}
+
+
 
 int main()
 {
@@ -97,5 +113,7 @@ int main()
     test_mul();
     test_transpose();
     test_softmax();
+    test_memory();
+
     return 0;
 }
