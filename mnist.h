@@ -493,8 +493,8 @@ class MNISTDataLoader
 
 float get_accuracy(const Network<precision>& nt, MNISTDataLoader& loader)
 {
-    // We will randomly select 5000 items from the set and calculate the accuracy
-    batchtype data = loader.fetch(5000);
+    // We will randomly select 3000 items from the set and calculate the accuracy
+    batchtype data = loader.fetch(3000);
     auto sm = nt.eval(data.first);
     size_t totcorrect = 0;
     for(size_t r = 0; r < sm.rows(); ++r) {

@@ -1,0 +1,11 @@
+Starting MNIST training ...
+Ep:1/5, Batch:10/60) Loss: 1.470, Train Acc: 0.660, Test Acc: 0.637
+Ep:1/5, Batch:20/60) Loss: 1.046, Train Acc: 0.772, Test Acc: 0.784
+Ep:1/5, Batch:30/60) Loss: 0.788, Train Acc: 0.821, Test Acc: 0.836
+Ep:1/5, Batch:40/60) Loss: 0.712, Train Acc: 0.837, Test Acc: 0.853
+Ep:1/5, Batch:50/60) Loss: 0.577, Train Acc: 0.854, Test Acc: 0.858
+Ep:1/5, Batch:60/60) Loss: 0.543, Train Acc: 0.868, Test Acc: 0.865
+Ep:2/5, Batch:10/60) Loss: 0.547, Train Acc: 0.878, Test Acc: 0.873
+Ep:2/5, Batch:20/60) Loss: 0.457, Train Acc: 0.876, Test Acc: 0.885
+Ep:2/5, Batch:30/60) Loss: 0.463, Train Acc: 0.879, Test Acc: 0.884
+Ep:2/5, Batch:40/60) Loss: 0.451, Train Acc: 0.877, Test Acc: 0.898

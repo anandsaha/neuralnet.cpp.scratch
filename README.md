@@ -6,10 +6,11 @@ Developed on Ubuntu 16.04 using g++ 5.4 `g++ (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4
 
 ### Important Files
 
-`mnist.h`: Main file with all the code
-`main.cpp`: Calls the `mnist()` function in `mnist.h`, that's all
-`data`: Directory where MNIST files are kept
-`data\dl.sh`: Bash script to download and unzip the MNIST files
+* `mnist.h`: Main file with all the code
+* `main.cpp`: Calls the `mnist()` function in `mnist.h`, that's all
+* `data`: Directory where MNIST files are kept
+* `data\dl.sh`: Bash script to download and unzip the MNIST files
+* `output.txt`: Execution log of a full run with 5 episodes 
 
 ### Download data
 
