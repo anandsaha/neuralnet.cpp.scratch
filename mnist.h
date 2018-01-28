@@ -15,8 +15,8 @@ using namespace std;
 // -----------------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------------
-const size_t num_epochs = 5;
-const size_t batch_size = 1000;
+const size_t num_epochs = 10;
+const size_t batch_size = 5000;
 const size_t pixels     = 784;   // 28 * 28
 const float  wt_reg     = 0.5;   // weight regularization strength
 const float  learn_rate = 0.001; 
@@ -526,7 +526,7 @@ void mnist()
             batchtype batch = train.fetch(batch_size);
             auto sm = nt.forward(batch.first);
             // Report progress
-            if (j%10 == 0) {
+            if (j%1 == 0) {
                 float loss = logloss(batch.second, sm);
                 float trainacc = get_accuracy(nt, train);
                 float testacc = get_accuracy(nt, test);
