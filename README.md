@@ -31,6 +31,12 @@ make
 ./mnist
 ```
 
+### Loss and Accuracy
+
+![Loss](data/loss.png)
+
+![Loss](data/accuracy.png)
+
 ### Valgrind Report
 
 ```
