@@ -1,4 +1,5 @@
 #include "mnist.h"
+#include <sys/resource.h>
 
 int main()
 {

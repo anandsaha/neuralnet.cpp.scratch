@@ -19,8 +19,8 @@ const char* train_label = "data/train-labels-idx1-ubyte";
 const char* test_data   = "data/t10k-images-idx3-ubyte";
 const char* test_label  = "data/t10k-labels-idx1-ubyte";
 
-const size_t num_epochs = 6;
-const size_t batch_size = 10000;
+const size_t num_epochs = 50;
+const size_t batch_size = 1000;
 const size_t pixels     = 784; // 28 * 28
 const float  learn_rate = 0.001;
 
@@ -141,6 +141,7 @@ class Tensor2D
                 _data = nullptr;
             }
         }
+
 };
 
 // Print tensor
@@ -239,8 +240,8 @@ Tensor2D<T> transpose(const Tensor2D<T>& input) {
 // Reading MNIST train/test data with iterator
 // -----------------------------------------------------------------------------
 
-int b2i(const char* ptr, size_t idx) {
-    int val = 0;
+unsigned int b2i(const char* ptr, size_t idx) {
+    unsigned int val = 0;
     val |= (unsigned char)ptr[idx+0]; val <<= 8;
     val |= (unsigned char)ptr[idx+1]; val <<= 8;
     val |= (unsigned char)ptr[idx+2]; val <<= 8;
@@ -280,7 +281,7 @@ class MNISTDataLoader
                 size_t offset = dis(gen);
                 label[i][0] = _label[8 + offset];
                 int off = 16 + (offset * pixels);
-                for(int p = 0; p < pixels; p++) 
+                for(size_t p = 0; p < pixels; p++)
                     data[i][p] = (int)((unsigned char)_data[off + p]);
             }
 
@@ -376,12 +377,11 @@ T logloss(const Tensor2D<int>& actual, const Tensor2D<T>& prediction) {
 
 // ReLU activation function
 template <typename T>
-Tensor2D<T>& relu(Tensor2D<T>& input) {
+void relu(Tensor2D<T>& input) {
     for(size_t r = 0; r < input.rows(); r++)
         for(size_t c = 0; c < input.cols(); c++)
             if(input[r][c] <= 0.0)
                 input[r][c] = 0.0;
-    return input;
 }
 
 // Linear layer
@@ -390,15 +390,15 @@ class Linear
 {
     public:
         explicit Linear(size_t in, size_t out, bool add_relu = true)
-            : weights(in, out), biases(1, out), activations(0, 0), 
-              weights_grad(in, out), biases_grad(1, out), add_relu(add_relu) {
+            : weights(in, out), biases(1, out), weights_grad(in, out),
+              biases_grad(1, out), activations(1, 1), add_relu(add_relu) {
                 init();
         }
 
         void forward(const Tensor2D<T>& input) {
             auto scores = add(dot(input, weights), biases);
-            if(add_relu) activations = relu(scores);
-            else activations = scores;
+            if(add_relu) relu(scores);
+            activations = scores;
         }
 
         Tensor2D<T> eval(const Tensor2D<T>& input) {
