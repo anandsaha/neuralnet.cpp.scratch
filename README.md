@@ -1,4 +1,4 @@
-# LeapMind
+# Neural Net in CPP from scratch
 
 Neural net implementation in C++ from scratch. Trained MNIST with 3 layer network. Added weight regularization.
 
